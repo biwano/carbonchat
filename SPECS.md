@@ -13,14 +13,13 @@ An API endpoint triggers an AI agent (via OpenRouter) to perform web research an
 When a user interacts with the chatbot, **all documents are retrieved** and injected — along with their corresponding document type instructions — as a rich system prompt to ground every response in the curated knowledge base.
 
 ## Core Features
-- **Document Types Management**: Reusable transformation instruction templates (name, instructions, description)
-- **Documents Management**:
-  - API endpoint to trigger AI-powered scraping/research (`POST /api/documents/scrape`)
-  - Each document references a `document_type`, has a `search_query`, and stores the resulting `content`
-- **AI Chatbot**: Loads **all documents** + their associated document type instructions and injects them as system preprompt/context for every user question
-- **Real-time Chat Interface**: Modern UI with streaming AI responses
-- **Knowledge Dashboard**: CRUD interface for both `document_types` and `documents`, with one-click "scrape now" buttons
-- **User Authentication**: Supabase Auth (for protecting admin/knowledge management features)
+- **AI Chatbot**: Primary interface; loads **all documents** + their associated document type instructions as rich system context/preprompt for every response.
+- **Administration Panel** (renamed from "Settings"): Protected section containing:
+  - **Document Types Management**: Reusable transformation instruction templates (name, instructions, description).
+  - **Documents Management**: CRUD + one-click "Research Now" buttons that trigger AI-powered scraping.
+- **Document Scraper**: `POST /api/documents/scrape` endpoint using OpenRouter to research `search_query` and synthesize per `document_type` rules.
+- **Real-time Chat Interface**: Modern streaming responses grounded in the full knowledge base.
+- **User Authentication**: Supabase Auth (protects Administration panel; public read for chatbot).
 
 ## Technical Stack
 
@@ -38,14 +37,16 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 **Core Principle**: The database (Supabase) is **used only to store the knowledge base**. Chat history is kept in-memory or in a separate lightweight store if needed.
 
 ### Key Components
-1. **Document Scraper Service**: `POST /api/documents/scrape` endpoint that uses OpenRouter + web search capabilities to research a query and synthesize knowledge according to a `document_type`'s `transformation_instructions`.
-2. **Knowledge Base Layer**: Two Supabase tables (`document_types` and `documents`) with proper foreign key relationship.
+1. **Document Scraper Service**: `POST /api/documents/scrape` endpoint that uses OpenRouter (with search capabilities) to research a query and synthesize knowledge according to a `document_type`'s `transformation_instructions`.
+2. **Knowledge Base Layer**: Two Supabase tables (`document_types` and `documents`) with proper foreign key relationship. **All schema changes must use timestamp-prefixed migration files** in `supabase/migrations/` (e.g. `20260415114130_initial_schema.sql`).
 3. **Chat Engine**: On every user message, the system:
-   - Loads all documents
-   - Builds a rich system prompt containing all document content + their associated transformation rules
-   - Streams the response from OpenRouter
-4. **Admin Dashboard**: Interface to manage Document Types and Documents, trigger scraping, and preview generated knowledge.
-5. **AI Service Layer**: Centralized service using the `openai` SDK configured for OpenRouter, with structured prompting, streaming support, and model selection for both research/scraping and conversational responses.
+   - Loads all documents (with joined type instructions)
+   - Builds a rich system prompt containing all document content + transformation rules
+   - Returns streamed or JSON response from OpenRouter
+4. **UI Structure**: 
+   - Prominent **Chat** tab (always visible).
+   - **Administration** tab (replaces previous "Settings"/separate Documents/Types tabs) that contains Documents + Document Types management (to be hidden behind auth in future).
+5. **AI Service Layer**: Centralized OpenAI client configured for OpenRouter.
 
 ### Supabase Data Model
 
@@ -82,12 +83,13 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - Accessibility compliant
 
 ## Next Steps
-1. ✅ Create Next.js 15 project with TypeScript, Tailwind, shadcn/ui, and Supabase client
-2. ✅ Set up Supabase schema using **timestamped migration files** (`supabase/migrations/20260415114130_initial_schema.sql`)
-3. Implement Document Scraper API endpoint (`POST /api/documents/scrape`) using `openai` SDK + OpenRouter
-4. Build main Chat interface that loads all documents and injects them as system context/preprompt
-5. Create admin dashboard for managing Document Types and Documents
-6. Add realtime features using Supabase Realtime
+1. ✅ Create Next.js 15 project with TypeScript, Tailwind, shadcn/ui (Base UI), and Supabase client
+2. ✅ Set up Supabase schema **exclusively using timestamp-prefixed migration files** (`supabase/migrations/20260415114130_initial_schema.sql` — no `schema.sql` or direct SQL editor for schema changes)
+3. ✅ Implement core APIs (`/api/chat`, `/api/documents*`, `/api/document-types`) and knowledge injection
+4. ✅ Build modern tabbed UI with **Chat** (primary) + **Administration** (contains Documents + Types panels)
+5. Implement **User Authentication** (Supabase Auth) to protect the Administration tab
+6. Add full streaming responses to chat + Supabase Realtime (presence, live document updates)
+7. Enhance scraper with proper tool calling for real web research (currently prompt-only)
 
 ---
 
@@ -99,4 +101,4 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - Knowledge is dynamically built by AI agents performing internet research via OpenRouter
 - Every chatbot response is grounded by injecting the entire knowledge base as system context
 
-**Current Status**: Core implemented — Supabase schema (via migration), full CRUD APIs for document_types/documents, scrape endpoint (AI research via OpenRouter/Gemini), tabbed UI with Chat + Documents + Types panels, knowledge injection in chat. Improvements made: fixed API/UX bugs, cleaned index, updated docs. Next: full streaming, auth, realtime subscriptions, advanced research tools.
+**Current Status**: Core MVP complete (schema via timestamped migration, APIs, knowledge-grounded chat, admin panels). UI restructured per command: Documents + Types now hidden under renamed **Administration** tab (Settings button updated in plan). All future DB changes **must** use dated migration files. Next milestone: protect Administration with Supabase Auth + implement full streaming.
