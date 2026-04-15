@@ -82,10 +82,10 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - Accessibility compliant
 
 ## Next Steps
-1. Create initial Next.js 15 project with TypeScript, Tailwind, shadcn/ui, and Supabase
-2. Set up Supabase schema (`document_types` + `documents` tables with foreign key)
-3. Implement Document Scraper API endpoint (`POST /api/documents/scrape`)
-4. Build main Chat interface that injects all documents as system context
+1. ✅ Create Next.js 15 project with TypeScript, Tailwind, shadcn/ui, and Supabase client
+2. ✅ Set up Supabase schema using **timestamped migration files** (`supabase/migrations/20260415114130_initial_schema.sql`)
+3. Implement Document Scraper API endpoint (`POST /api/documents/scrape`) using `openai` SDK + OpenRouter
+4. Build main Chat interface that loads all documents and injects them as system context/preprompt
 5. Create admin dashboard for managing Document Types and Documents
 6. Add realtime features using Supabase Realtime
 
@@ -99,4 +99,4 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - Knowledge is dynamically built by AI agents performing internet research via OpenRouter
 - Every chatbot response is grounded by injecting the entire knowledge base as system context
 
-**Next milestone**: Initialize the Next.js + Supabase project and implement the core data model.
+**Current Status**: Core implemented — Supabase schema (via migration), full CRUD APIs for document_types/documents, scrape endpoint (AI research via OpenRouter/Gemini), tabbed UI with Chat + Documents + Types panels, knowledge injection in chat. Improvements made: fixed API/UX bugs, cleaned index, updated docs. Next: full streaming, auth, realtime subscriptions, advanced research tools.
