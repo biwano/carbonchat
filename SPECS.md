@@ -44,8 +44,9 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
    - Builds a rich system prompt containing all document content + transformation rules
    - Returns streamed or JSON response from OpenRouter
 4. **UI Structure**: 
-   - Prominent **Chat** tab (always visible).
-   - **Administration** tab (replaces previous "Settings"/separate Documents/Types tabs) that contains Documents + Document Types management (to be hidden behind auth in future).
+   - Full-page **Chat** interface at `/` (no tab selector).
+   - Dedicated full-page **Administration** route at `/admin` (replaces previous Settings/Administration tab selector and separate panels; "Back to Chat" button removed from admin header for cleaner full-page experience).
+   - **Theme**: Default shadcn/ui dark theme only. Remove all custom/hardcoded colors (e.g. `violet-*`, `zinc-*`, `emerald-*`, specific bg-*/text-*/border-* Tailwind color classes). Use only semantic theme classes (`bg-background`, `text-foreground`, `bg-card`, `border-border`, `bg-primary`, `text-primary-foreground`, `bg-muted`, etc.). Apply `dark` class by default to `<html>` in layout. Simplify `globals.css` to rely on Tailwind v4 + shadcn defaults without extensive custom oklch color palette.
 5. **AI Service Layer**: Centralized OpenAI client configured for OpenRouter.
 
 ### Supabase Data Model
@@ -79,26 +80,6 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - High-quality AI-generated knowledge (good research + synthesis)
 - Low latency chat responses with streaming
 - Privacy-focused (especially around web scraping and user queries)
-- Responsive, modern UI (mobile-first)
+- Responsive, modern UI using **default shadcn/ui dark theme only** (mobile-first, semantic color classes, no custom color palette)
 - Accessibility compliant
 
-## Next Steps
-1. ✅ Create Next.js 15 project with TypeScript, Tailwind, shadcn/ui (Base UI), and Supabase client
-2. ✅ Set up Supabase schema **exclusively using timestamp-prefixed migration files** (`supabase/migrations/20260415114130_initial_schema.sql` — no `schema.sql` or direct SQL editor for schema changes)
-3. ✅ Implement core APIs (`/api/chat`, `/api/documents*`, `/api/document-types`) and knowledge injection
-4. ✅ Build modern tabbed UI with **Chat** (primary) + **Administration** (contains Documents + Types panels)
-5. Implement **User Authentication** (Supabase Auth) to protect the Administration tab
-6. Add full streaming responses to chat + Supabase Realtime (presence, live document updates)
-7. Enhance scraper with proper tool calling for real web research (currently prompt-only)
-
----
-
-**Status**: This document is the **living specification** for Carbonchat. All implementation decisions must follow this spec.
-
-**Current Project Definition**:
-- A realtime AI-powered **Knowledge Chatbot**
-- Database is used **exclusively** to store `document_types` and `documents`
-- Knowledge is dynamically built by AI agents performing internet research via OpenRouter
-- Every chatbot response is grounded by injecting the entire knowledge base as system context
-
-**Current Status**: Core MVP complete (schema via timestamped migration, APIs, knowledge-grounded chat, admin panels). UI restructured per command: Documents + Types now hidden under renamed **Administration** tab (Settings button updated in plan). All future DB changes **must** use dated migration files. Next milestone: protect Administration with Supabase Auth + implement full streaming.

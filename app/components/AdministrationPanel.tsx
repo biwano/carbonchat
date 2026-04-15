@@ -13,18 +13,18 @@ export default function AdministrationPanel() {
     <div className="space-y-6">
       <div className="mb-8">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-violet-600/10 rounded-lg flex items-center justify-center">
-            <Settings className="w-5 h-5 text-violet-400" />
+          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+            <Settings className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-3xl font-bold">Administration</h2>
-            <p className="text-zinc-400">Manage document types and AI-generated knowledge entries</p>
+            <h2 className="text-3xl font-bold text-foreground">Administration</h2>
+            <p className="text-muted-foreground">Manage document types and AI-generated knowledge entries</p>
           </div>
         </div>
       </div>
 
       <Tabs value={activeAdminTab} onValueChange={setActiveAdminTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 bg-zinc-900 border border-zinc-800">
+        <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted border border-border">
           <TabsTrigger value="documents" className="flex items-center gap-2">
             <BookOpen className="w-4 h-4" />
             Documents

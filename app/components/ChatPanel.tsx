@@ -70,7 +70,7 @@ export default function ChatPanel() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-180px)]">
-      <div className="flex-1 overflow-auto space-y-6 p-6 bg-zinc-950 rounded-2xl border border-zinc-800">
+      <div className="flex-1 overflow-auto space-y-6 p-6 bg-card rounded-2xl border border-border">
         {messages.map((message, index) => (
           <div
             key={index}
@@ -79,17 +79,17 @@ export default function ChatPanel() {
             <div
               className={`max-w-[80%] rounded-2xl px-5 py-3.5 ${
                 message.role === 'user'
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-zinc-900 border border-zinc-700'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted border border-border'
               }`}
             >
               {message.role === 'assistant' && (
-                <div className="flex items-center gap-2 mb-2 text-violet-400">
+                <div className="flex items-center gap-2 mb-2 text-primary">
                   <Bot className="w-4 h-4" />
                   <span className="text-xs font-medium">KNOWLEDGE BOT</span>
                 </div>
               )}
-              <div className="text-sm leading-relaxed whitespace-pre-wrap">
+              <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
                 {message.content}
               </div>
             </div>
@@ -98,25 +98,25 @@ export default function ChatPanel() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="mt-4 border-t border-zinc-800 pt-4">
+      <div className="mt-4 border-t border-border pt-4">
         <div className="flex gap-3">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask a question... (The bot will use all available knowledge as context)"
-            className="min-h-[60px] bg-zinc-900 border-zinc-700 resize-y"
+            className="min-h-[60px] bg-muted border-border resize-y"
             disabled={isLoading}
           />
           <Button 
             onClick={sendMessage} 
             disabled={isLoading || !input.trim()}
-            className="bg-violet-600 hover:bg-violet-700 px-8 self-end"
+            className="px-8 self-end"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-center text-zinc-500 mt-3">
+        <p className="text-[10px] text-center text-muted-foreground mt-3">
           All documents in the knowledge base are automatically injected as context
         </p>
       </div>
