@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { supabase } from '@/lib/supabase';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  defaultHeaders: {
-    'HTTP-Referer': 'https://carbonchat.local',
-    'X-Title': 'Carbonchat',
-  },
-});
+import { AI_MODEL } from '@/lib/constants';
+import { openai } from '@/lib/openai.utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,12 +28,8 @@ export async function POST(request: NextRequest) {
     let knowledgeContext = "You have access to the following knowledge base:\n\n";
 
     if (documents && documents.length > 0) {
-      documents.forEach((doc: any, index: number) => {
-        const instructions = doc.document_types?.transformation_instructions || '';
+      documents.forEach((doc, index) => {
         knowledgeContext += `--- Document ${index + 1} ---\n`;
-        if (instructions) {
-          knowledgeContext += `Transformation Style: ${instructions}\n\n`;
-        }
         knowledgeContext += `${doc.content}\n\n`;
       });
     } else {
@@ -51,7 +39,7 @@ export async function POST(request: NextRequest) {
     knowledgeContext += "\nAnswer the user's question using ONLY the information above. If you don't know something, say so. Be helpful, accurate, and direct.";
 
     const completion = await openai.chat.completions.create({
-      model: 'google/gemini-2.0-flash-exp',
+      model: AI_MODEL,
       messages: [
         { 
           role: 'system', 

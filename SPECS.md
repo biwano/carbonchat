@@ -16,8 +16,8 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - **AI Chatbot**: Primary interface; loads **all documents** + their associated document type instructions as rich system context/preprompt for every response.
 - **Administration Panel** (renamed from "Settings"): Section for knowledge management at `/admin`:
   - **Document Types Management**: Full CRUD support (create, read, **update**, **delete**) for transformation instruction templates. All operations are performed **directly from the frontend** using the Supabase client.
-  - **Documents Management**: CRUD + one-click "Research Now" buttons that trigger AI-powered scraping.
-- **Document Scraper**: `POST /api/documents/scrape` endpoint using OpenRouter to research `search_query` and synthesize per `document_type` rules.
+  - **Documents Management**: CRUD + one-click "Research Now" buttons that trigger AI-powered scraping. Update document's name, search query, or manual content editing. Refresh existing documents via the research endpoint.
+- **Document Scraper**: `POST /api/documents/scrape` endpoint using OpenRouter to research `search_query` and synthesize per `document_type` rules. Supports both initial creation and updating (refreshing) existing documents.
 - **Real-time Chat Interface**: Modern streaming responses grounded in the full knowledge base.
 - **Unrestricted Public Access**: Row Level Security (RLS) is configured to allow **unauthenticated (anon) CRUD access** to both `document_types` and `documents` tables (useful for development/testing).
 
@@ -85,7 +85,7 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 
 ---
 
-**Current Status**: Core implementation complete. Next priority: Implementing full CRUD for Document Types and Documents directly from the frontend, and opening up RLS for unrestricted development/testing access.
+**Current Status**: Core implementation complete. Next priority: expanding Document Types management (Update/Delete) and simplifying RLS for unrestricted development/testing access.
 
 ## Implementation Plan: Frontend CRUD & Public RLS
 1. **Migration**: Create `supabase/migrations/20260415130000_public_crud_rls.sql` to enable `INSERT`, `UPDATE`, `DELETE` for `anon` on `document_types` and `documents`.
@@ -97,4 +97,13 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
    - **DocumentsPanel.tsx**:
      - Add **Delete** logic using the Supabase client directly.
 3. **API Cleanup**: Remove existing API routes for `document-types` and `documents` (except `/api/documents/scrape` and `/api/chat` which require server-side logic for AI interactions) to ensure all CRUD is frontend-driven.
+4. **Document Admin Implementation**:
+   - **API Update (`/api/documents/scrape`)**:
+     - Support an **optional** `id` parameter.
+     - If `id` is provided, update the existing document's `content` and `metadata` instead of inserting a new one.
+   - **Documents Management UI (`DocumentsPanel.tsx`)**:
+     - Replace `prompt` with a proper **Create/Edit Document** dialog using shadcn/ui.
+     - Add **Edit** functionality (update `name`, `search_query`, or `document_type_id`). **Content remains read-only** in the UI and is only updated via the AI research process.
+     - Add **Refresh** (Research Again) button that updates the existing document via the scrape API.
+     - Add **Create** button for new documents (triggers initial research).
 

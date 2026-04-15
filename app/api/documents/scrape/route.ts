@@ -1,38 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { supabase } from '@/lib/supabase';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-  defaultHeaders: {
-    'HTTP-Referer': 'https://carbonchat.local',
-    'X-Title': 'Carbonchat',
-  },
-});
+import { AI_MODEL } from '@/lib/constants';
+import { openai } from '@/lib/openai.utils';
 
 export async function POST(request: NextRequest) {
   try {
-    const { documentTypeId, name, searchQuery } = await request.json();
+    const { id } = await request.json();
 
-    if (!documentTypeId || !searchQuery) {
+    if (!id) {
       return NextResponse.json(
-        { error: 'documentTypeId and searchQuery are required' },
+        { error: 'id is required' },
         { status: 400 }
       );
     }
 
-    // Fetch the document type to get transformation instructions
-    const { data: docType, error: typeError } = await supabase
-      .from('document_types')
-      .select('name, transformation_instructions')
-      .eq('id', documentTypeId)
+    // Fetch the document and its associated document type instructions
+    const { data: document, error: docError } = await supabase
+      .from('documents')
+      .select(`
+        id,
+        search_query,
+        document_type_id,
+        document_types (
+          transformation_instructions
+        )
+      `)
+      .eq('id', id)
       .single();
 
-    if (typeError || !docType) {
+    if (docError || !document) {
       return NextResponse.json(
-        { error: 'Document type not found' },
+        { error: 'Document not found. Scrape can only be performed on existing documents.' },
         { status: 404 }
+      );
+    }
+
+    const searchQuery = document.search_query;
+    const transformationInstructions = (document.document_types as unknown as { transformation_instructions: string })?.transformation_instructions;
+
+    if (!searchQuery || !transformationInstructions) {
+      return NextResponse.json(
+        { error: 'Document is missing search query or transformation instructions' },
+        { status: 400 }
       );
     }
 
@@ -45,7 +54,7 @@ Your task:
 2. Synthesize the information according to these specific transformation instructions:
 
 **Transformation Instructions:**
-${docType.transformation_instructions}
+${transformationInstructions}
 
 **Query to Research:**
 ${searchQuery}
@@ -56,7 +65,7 @@ Be accurate, insightful, and focus on creating high-quality knowledge.
 
     // Call OpenRouter (via OpenAI SDK) - using cheapest good model
     const completion = await openai.chat.completions.create({
-      model: 'google/gemini-2.0-flash-exp', // Cheapest high-quality model on OpenRouter
+      model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Please research and synthesize knowledge about: ${searchQuery}` }
@@ -68,32 +77,32 @@ Be accurate, insightful, and focus on creating high-quality knowledge.
     const generatedContent = completion.choices[0]?.message?.content || 
       'Failed to generate content.';
 
-    // Save to database
-    const { data: document, error: insertError } = await supabase
+    // Update the existing document's content, updated_at, and metadata
+    const { data: updatedDocument, error: updateError } = await supabase
       .from('documents')
-      .insert({
-        name: name || `Research: ${searchQuery.substring(0, 50)}...`,
-        document_type_id: documentTypeId,
-        search_query: searchQuery,
+      .update({
         content: generatedContent,
+        updated_at: new Date().toISOString(),
         metadata: {
           model: completion.model,
           tokens: completion.usage,
           generated_at: new Date().toISOString(),
+          is_refresh: true
         }
       })
+      .eq('id', id)
       .select()
       .single();
-
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      return NextResponse.json({ error: 'Failed to save document' }, { status: 500 });
+    
+    if (updateError) {
+      console.error('Update error:', updateError);
+      return NextResponse.json({ error: 'Failed to update document' }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      document,
-      message: 'Document successfully generated and saved.'
+      document: updatedDocument,
+      message: 'Document successfully refreshed.'
     });
 
   } catch (error: unknown) {
