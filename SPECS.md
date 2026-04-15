@@ -14,12 +14,12 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 
 ## Core Features
 - **AI Chatbot**: Primary interface; loads **all documents** + their associated document type instructions as rich system context/preprompt for every response.
-- **Administration Panel** (renamed from "Settings"): Protected section containing:
-  - **Document Types Management**: Reusable transformation instruction templates (name, instructions, description).
+- **Administration Panel** (renamed from "Settings"): Section for knowledge management at `/admin`:
+  - **Document Types Management**: Full CRUD support (create, read, **update**, **delete**) for transformation instruction templates. All operations are performed **directly from the frontend** using the Supabase client.
   - **Documents Management**: CRUD + one-click "Research Now" buttons that trigger AI-powered scraping.
 - **Document Scraper**: `POST /api/documents/scrape` endpoint using OpenRouter to research `search_query` and synthesize per `document_type` rules.
 - **Real-time Chat Interface**: Modern streaming responses grounded in the full knowledge base.
-- **User Authentication**: Supabase Auth (protects Administration panel; public read for chatbot).
+- **Unrestricted Public Access**: Row Level Security (RLS) is configured to allow **unauthenticated (anon) CRUD access** to both `document_types` and `documents` tables (useful for development/testing).
 
 ## Technical Stack
 
@@ -82,4 +82,19 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - Privacy-focused (especially around web scraping and user queries)
 - Responsive, modern UI using **default shadcn/ui dark theme only** (mobile-first, semantic color classes, no custom color palette)
 - Accessibility compliant
+
+---
+
+**Current Status**: Core implementation complete. Next priority: Implementing full CRUD for Document Types and Documents directly from the frontend, and opening up RLS for unrestricted development/testing access.
+
+## Implementation Plan: Frontend CRUD & Public RLS
+1. **Migration**: Create `supabase/migrations/20260415130000_public_crud_rls.sql` to enable `INSERT`, `UPDATE`, `DELETE` for `anon` on `document_types` and `documents`.
+2. **Frontend Implementation**:
+   - **DocumentTypesPanel.tsx**:
+     - Implement **Create** functionality using the Supabase client directly.
+     - Add **Update** (Edit) logic using the Supabase client directly.
+     - Add **Delete** logic using the Supabase client directly.
+   - **DocumentsPanel.tsx**:
+     - Add **Delete** logic using the Supabase client directly.
+3. **API Cleanup**: Remove existing API routes for `document-types` and `documents` (except `/api/documents/scrape` and `/api/chat` which require server-side logic for AI interactions) to ensure all CRUD is frontend-driven.
 
