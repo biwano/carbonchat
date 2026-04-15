@@ -29,7 +29,7 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 - **Database**: Supabase (PostgreSQL) — **used exclusively for the knowledge base**
 - **Auth**: Supabase Auth
 - **Real-time**: Supabase Realtime (for chat presence and live updates)
-- **AI Integration**: **OpenRouter** (for both knowledge scraping/research and chat responses)
+- **AI Integration**: **OpenRouter** via the official `openai` SDK (configured with `baseURL: "https://openrouter.ai/api/v1"` and required headers)
 - **Web Scraping / Research**: AI agents via OpenRouter (with search capabilities)
 - **Deployment**: Vercel (with Edge Functions where possible)
 
@@ -45,7 +45,7 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
    - Builds a rich system prompt containing all document content + their associated transformation rules
    - Streams the response from OpenRouter
 4. **Admin Dashboard**: Interface to manage Document Types and Documents, trigger scraping, and preview generated knowledge.
-5. **AI Service Layer**: Centralized OpenRouter client with structured prompting for both research and chat.
+5. **AI Service Layer**: Centralized service using the `openai` SDK configured for OpenRouter, with structured prompting, streaming support, and model selection for both research/scraping and conversational responses.
 
 ### Supabase Data Model
 
