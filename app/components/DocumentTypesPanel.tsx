@@ -198,7 +198,7 @@ export default function DocumentTypesPanel() {
               </CardHeader>
               <CardContent>
                 {type.description && <p className="text-sm text-muted-foreground mb-3">{type.description}</p>}
-                <div className="bg-muted p-4 rounded-lg text-sm font-mono text-foreground border border-border leading-relaxed">
+                <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60">
                   {type.transformation_instructions}
                 </div>
               </CardContent>
