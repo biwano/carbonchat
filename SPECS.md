@@ -103,7 +103,9 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
      - If `id` is provided, update the existing document's `content` and `metadata` instead of inserting a new one.
    - **Documents Management UI (`DocumentsPanel.tsx`)**:
      - Replace `prompt` with a proper **Create/Edit Document** dialog using shadcn/ui.
-     - Add **Edit** functionality (update `name`, `search_query`, or `document_type_id`). **Content remains read-only** in the UI and is only updated via the AI research process.
+     - Add **Edit** functionality (update `name`, `search_query`, or `document_type_id`). **Content remains read-only** in the UI and is only updated via the AI research process. **Content is hidden by default** using a collapsible section to maintain a clean overview.
      - Add **Refresh** (Research Again) button that updates the existing document via the scrape API.
      - Add **Create** button for new documents (triggers initial research).
+   - **Document Types UI (`DocumentTypesPanel.tsx`)**:
+     - **Transformation instructions are hidden by default** using a collapsible section to reduce visual noise.
 

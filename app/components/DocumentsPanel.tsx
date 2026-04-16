@@ -3,8 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Play, FileText, Trash2, Plus, Edit, Loader2 } from 'lucide-react';
+import { RefreshCw, Play, FileText, Trash2, Plus, Edit, Loader2, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -273,11 +278,23 @@ export default function DocumentsPanel() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-xs text-muted-foreground mb-2">Query: {doc.search_query}</div>
-                <div className="max-h-60 overflow-auto bg-muted p-4 rounded border border-border text-sm whitespace-pre-wrap font-light text-foreground leading-relaxed">
-                  {doc.content}
-                </div>
-                <div className="flex justify-between items-center mt-3">
+                <div className="text-xs text-muted-foreground mb-4">Query: {doc.search_query}</div>
+                
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50">
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Document Content</span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2">
+                    <div className="max-h-96 overflow-auto bg-muted p-4 rounded border border-border text-sm whitespace-pre-wrap font-light text-foreground leading-relaxed">
+                      {doc.content}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                <div className="flex justify-between items-center mt-4 pt-4 border-t border-border/50">
                   <div className="text-[10px] text-muted-foreground">
                     Created: {new Date(doc.created_at).toLocaleString()}
                   </div>
