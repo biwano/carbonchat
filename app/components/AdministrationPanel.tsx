@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, BookOpen } from 'lucide-react';
+import { Settings, BookOpen, HelpCircle } from 'lucide-react';
 import DocumentsPanel from './DocumentsPanel';
 import DocumentTypesPanel from './DocumentTypesPanel';
+import HelpPanel from './HelpPanel';
 
 export default function AdministrationPanel() {
   const [activeAdminTab, setActiveAdminTab] = useState('documents');
@@ -24,7 +25,7 @@ export default function AdministrationPanel() {
       </div>
 
       <Tabs value={activeAdminTab} onValueChange={setActiveAdminTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted border border-border">
+        <TabsList className="grid w-full max-w-xl grid-cols-3 bg-muted border border-border">
           <TabsTrigger value="documents" className="flex items-center gap-2">
             <BookOpen className="w-4 h-4" />
             Documents
@@ -32,6 +33,10 @@ export default function AdministrationPanel() {
           <TabsTrigger value="types" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             Document Types
+          </TabsTrigger>
+          <TabsTrigger value="help" className="flex items-center gap-2">
+            <HelpCircle className="w-4 h-4" />
+            Help
           </TabsTrigger>
         </TabsList>
 
@@ -42,6 +47,10 @@ export default function AdministrationPanel() {
 
           <TabsContent value="types" className="mt-0">
             <DocumentTypesPanel />
+          </TabsContent>
+
+          <TabsContent value="help" className="mt-0">
+            <HelpPanel />
           </TabsContent>
         </div>
       </Tabs>
