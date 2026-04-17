@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
         search_query,
         document_type_id,
         document_types (
+          ai,
           transformation_instructions
         )
       `)
@@ -35,8 +36,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const documentType = document.document_types as unknown as { ai: boolean; transformation_instructions: string } | null;
     const searchQuery = document.search_query;
-    const transformationInstructions = (document.document_types as unknown as { transformation_instructions: string })?.transformation_instructions;
+    const transformationInstructions = documentType?.transformation_instructions;
+
+    if (documentType && documentType.ai === false) {
+      return NextResponse.json(
+        { error: 'Scraping is only available for AI document types. This document is manual — edit its content directly instead.' },
+        { status: 400 }
+      );
+    }
 
     if (!searchQuery || !transformationInstructions) {
       return NextResponse.json(

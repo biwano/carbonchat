@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw, Play, FileText, Trash2, Plus, Edit, Loader2, ChevronDown } from 'lucide-react';
+import AiBadge from './AiBadge';
 import { supabase } from '@/lib/supabase';
 import {
   Collapsible,
@@ -19,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -31,6 +33,7 @@ import {
 interface DocumentType {
   id: string;
   name: string;
+  ai: boolean;
 }
 
 interface Document {
@@ -43,6 +46,7 @@ interface Document {
   document_type_id: string;
   document_types: {
     name: string;
+    ai: boolean;
   };
 }
 
@@ -58,7 +62,8 @@ export default function DocumentsPanel() {
   const [formData, setFormData] = useState({
     name: '',
     search_query: '',
-    document_type_id: ''
+    document_type_id: '',
+    content: ''
   });
 
   const fetchDocuments = async () => {
@@ -69,7 +74,8 @@ export default function DocumentsPanel() {
         *,
         document_type_id,
         document_types (
-          name
+          name,
+          ai
         )
       `)
       .order('created_at', { ascending: false });
@@ -82,12 +88,15 @@ export default function DocumentsPanel() {
   const fetchDocumentTypes = async () => {
     const { data, error } = await supabase
       .from('document_types')
-      .select('id, name')
+      .select('id, name, ai')
       .order('name');
     
     if (data) setDocumentTypes(data);
     if (error) console.error('Error fetching document types:', error);
   };
+
+  const selectedType = documentTypes.find(t => t.id === formData.document_type_id);
+  const selectedTypeIsAi = selectedType?.ai ?? true;
 
   useEffect(() => {
     fetchDocuments();
@@ -114,7 +123,8 @@ export default function DocumentsPanel() {
     setFormData({
       name: '',
       search_query: '',
-      document_type_id: documentTypes[0]?.id || ''
+      document_type_id: documentTypes[0]?.id || '',
+      content: ''
     });
     setIsDialogOpen(true);
   };
@@ -124,25 +134,36 @@ export default function DocumentsPanel() {
     setFormData({
       name: doc.name,
       search_query: doc.search_query,
-      document_type_id: doc.document_type_id
+      document_type_id: doc.document_type_id,
+      content: doc.content ?? ''
     });
     setIsDialogOpen(true);
   };
 
   const handleSaveDocument = async () => {
-    if (!formData.name || !formData.search_query || !formData.document_type_id) {
+    if (!formData.name || !formData.document_type_id) {
       alert('Please fill in all fields.');
       return;
     }
 
+    if (selectedTypeIsAi && !formData.search_query) {
+      alert('Please provide a search query for AI-researched documents.');
+      return;
+    }
+
+    if (!selectedTypeIsAi && !formData.content) {
+      alert('Please provide content for manually-authored documents.');
+      return;
+    }
+
     if (editingDocument) {
-      // Just update metadata
       const { error } = await supabase
         .from('documents')
         .update({
           name: formData.name,
-          search_query: formData.search_query,
+          search_query: selectedTypeIsAi ? formData.search_query : '',
           document_type_id: formData.document_type_id,
+          content: formData.content,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingDocument.id);
@@ -155,29 +176,46 @@ export default function DocumentsPanel() {
         fetchDocuments();
       }
     } else {
-      // Create new document manually first, then trigger scrape
       setIsDialogOpen(false);
-      
-      const { data, error: insertError } = await supabase
-        .from('documents')
-        .insert({
-          name: formData.name,
-          search_query: formData.search_query,
-          document_type_id: formData.document_type_id,
-          content: 'Researching and generating knowledge...'
-        })
-        .select()
-        .single();
 
-      if (insertError) {
-        console.error('Error inserting document:', insertError);
-        alert('Failed to create document.');
-        return;
-      }
+      if (selectedTypeIsAi) {
+        const { data, error: insertError } = await supabase
+          .from('documents')
+          .insert({
+            name: formData.name,
+            search_query: formData.search_query,
+            document_type_id: formData.document_type_id,
+            content: 'Researching and generating knowledge...'
+          })
+          .select()
+          .single();
 
-      if (data) {
-        // Now trigger scrape for the new document
-        triggerScrape(data.id);
+        if (insertError) {
+          console.error('Error inserting document:', insertError);
+          alert('Failed to create document.');
+          return;
+        }
+
+        if (data) {
+          triggerScrape(data.id);
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from('documents')
+          .insert({
+            name: formData.name,
+            search_query: '',
+            document_type_id: formData.document_type_id,
+            content: formData.content
+          });
+
+        if (insertError) {
+          console.error('Error inserting document:', insertError);
+          alert('Failed to create document.');
+          return;
+        }
+
+        fetchDocuments();
       }
     }
   };
@@ -243,20 +281,23 @@ export default function DocumentsPanel() {
                       {doc.name}
                       {isScraping === doc.id && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
                     </CardTitle>
-                    <p className="text-xs text-primary">
-                      Type: {doc.document_types?.name || 'Unknown'}
+                    <p className="text-xs text-primary flex items-center gap-2">
+                      <span>Type: {doc.document_types?.name || 'Unknown'}</span>
+                      <AiBadge ai={doc.document_types?.ai} size="sm" />
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      disabled={!!isScraping}
-                      onClick={() => triggerScrape(doc.id)}
-                    >
-                      <Play className="w-3 h-3 mr-1" />
-                      Refresh Content
-                    </Button>
+                    {doc.document_types?.ai && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!!isScraping}
+                        onClick={() => triggerScrape(doc.id)}
+                      >
+                        <Play className="w-3 h-3 mr-1" />
+                        Refresh Content
+                      </Button>
+                    )}
                     <Button 
                       size="sm" 
                       variant="ghost" 
@@ -278,7 +319,9 @@ export default function DocumentsPanel() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-xs text-muted-foreground mb-4">Query: {doc.search_query}</div>
+                {doc.document_types?.ai && (
+                  <div className="text-xs text-muted-foreground mb-4">Query: {doc.search_query}</div>
+                )}
                 
                 <Collapsible>
                   <CollapsibleTrigger
@@ -313,13 +356,17 @@ export default function DocumentsPanel() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[720px]">
           <DialogHeader>
             <DialogTitle>{editingDocument ? 'Edit Document' : 'New Document'}</DialogTitle>
             <DialogDescription>
-              {editingDocument 
-                ? 'Update document metadata. Content can only be updated via &quot;Refresh Content&quot;.' 
-                : 'Enter research details. The AI will immediately start researching and generating content.'}
+              {editingDocument
+                ? selectedTypeIsAi
+                  ? 'Update document metadata and content. Use "Refresh Content" to regenerate content with AI research.'
+                  : 'Update document metadata and content. This document type is manual, so content is edited directly.'
+                : selectedTypeIsAi
+                  ? 'Enter research details. The AI will immediately start researching and generating content.'
+                  : 'Write the document content directly. This document type is manual — no AI research will be performed.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -354,20 +401,49 @@ export default function DocumentsPanel() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="query">Search Query</Label>
-              <Input
-                id="query"
-                placeholder="What should the AI research?"
-                value={formData.search_query}
-                onChange={(e) => setFormData({ ...formData, search_query: e.target.value })}
-              />
-            </div>
+            {selectedTypeIsAi && (
+              <div className="grid gap-2">
+                <Label htmlFor="query">Search Query</Label>
+                <Input
+                  id="query"
+                  placeholder="What should the AI research?"
+                  value={formData.search_query}
+                  onChange={(e) => setFormData({ ...formData, search_query: e.target.value })}
+                />
+              </div>
+            )}
+            {(editingDocument || !selectedTypeIsAi) && (
+              <div className="grid gap-2">
+                <Label htmlFor="content">Content</Label>
+                <Textarea
+                  id="content"
+                  placeholder={selectedTypeIsAi
+                    ? 'Document content. Edit manually or regenerate via Refresh Content.'
+                    : 'Write the document content here.'}
+                  value={formData.content}
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  className="min-h-[240px] max-h-[50vh] font-mono text-xs leading-relaxed"
+                />
+                {selectedTypeIsAi ? (
+                  <p className="text-xs text-muted-foreground">
+                    Manual edits are saved directly. Running &quot;Refresh Content&quot; will overwrite this with freshly researched content.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    This document type is manual. Content is written and edited directly — no AI research is performed.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveDocument}>
-              {editingDocument ? 'Save Changes' : 'Start Research'}
+              {editingDocument
+                ? 'Save Changes'
+                : selectedTypeIsAi
+                  ? 'Start Research'
+                  : 'Create Document'}
             </Button>
           </DialogFooter>
         </DialogContent>

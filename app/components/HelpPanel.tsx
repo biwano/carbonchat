@@ -8,6 +8,8 @@ import {
   MessageSquare,
   Workflow,
   Lightbulb,
+  Sparkles,
+  User,
 } from 'lucide-react';
 
 export default function HelpPanel() {
@@ -66,6 +68,30 @@ export default function HelpPanel() {
             — a prompt describing the desired structure, tone, format, level of
             detail, and any constraints.
           </p>
+          <p>
+            A type also has an{' '}
+            <span className="text-foreground font-medium">AI toggle</span>{' '}
+            that controls how its documents are produced:
+          </p>
+          <ul className="list-disc pl-6 space-y-2">
+            <li>
+              <span className="inline-flex items-center gap-1 text-foreground font-medium">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                AI-researched
+              </span>{' '}
+              (default) — documents of this type ask the AI to research a
+              search query and synthesize content according to the
+              transformation instructions.
+            </li>
+            <li>
+              <span className="inline-flex items-center gap-1 text-foreground font-medium">
+                <User className="w-3.5 h-3.5" />
+                Manual
+              </span>{' '}
+              — documents of this type are authored by you directly. No AI
+              research is performed, and the search query is not used.
+            </li>
+          </ul>
           <p>Examples:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>
@@ -103,11 +129,14 @@ export default function HelpPanel() {
           <p>
             A Document is a single{' '}
             <span className="text-foreground font-medium">knowledge entry</span>{' '}
-            in your knowledge base. It references one Document Type and defines
-            a <span className="text-foreground font-medium">search query</span>{' '}
-            — what the AI should research on the internet.
+            in your knowledge base. It references one Document Type and the
+            document&apos;s lifecycle depends on whether that type is
+            AI-researched or manual.
           </p>
-          <p>Lifecycle:</p>
+          <p className="text-foreground font-medium flex items-center gap-1">
+            <Sparkles className="w-4 h-4 text-primary" />
+            AI-researched documents
+          </p>
           <ol className="list-decimal pl-6 space-y-1">
             <li>You create a document with a name, type, and search query.</li>
             <li>
@@ -117,11 +146,30 @@ export default function HelpPanel() {
             <li>
               The synthesized{' '}
               <span className="text-foreground font-medium">content</span> is
-              stored on the document and shown read-only in the UI.
+              stored on the document. You can{' '}
+              <span className="text-foreground font-medium">edit it manually</span>{' '}
+              from the document&apos;s edit dialog for quick fixes, tweaks, or
+              additions.
             </li>
             <li>
               You can <span className="text-foreground font-medium">Refresh Content</span>{' '}
-              at any time to re-run the research and update the document.
+              at any time to re-run the research and regenerate the document
+              (this overwrites any manual edits).
+            </li>
+          </ol>
+          <p className="text-foreground font-medium flex items-center gap-1 pt-1">
+            <User className="w-4 h-4" />
+            Manual documents
+          </p>
+          <ol className="list-decimal pl-6 space-y-1">
+            <li>
+              You create a document with a name, type, and{' '}
+              <span className="text-foreground font-medium">content</span>{' '}
+              (written directly). The search query field is not shown.
+            </li>
+            <li>
+              You can edit the content at any time. No research or refresh is
+              ever performed for these documents.
             </li>
           </ol>
         </CardContent>
@@ -171,7 +219,10 @@ export default function HelpPanel() {
               Open the{' '}
               <span className="text-foreground font-medium">Document Types</span>{' '}
               tab and create a type that matches your need (e.g.
-              &quot;Wikipedia-style Summary&quot;).
+              &quot;Wikipedia-style Summary&quot;). Decide whether it should be{' '}
+              <span className="text-foreground font-medium">AI-researched</span>{' '}
+              or <span className="text-foreground font-medium">Manual</span>{' '}
+              using the toggle on the form.
             </li>
             <li>
               Write clear, specific{' '}
@@ -183,13 +234,24 @@ export default function HelpPanel() {
             <li>
               Switch to the{' '}
               <span className="text-foreground font-medium">Documents</span> tab
-              and create a new document with a focused search query.
+              and create a new document. For AI types, provide a focused
+              search query. For manual types, write the content directly.
             </li>
-            <li>Wait for the AI to finish researching and generating content.</li>
             <li>
-              Review the result, then{' '}
+              For AI documents, wait for the research to finish. For manual
+              documents, your content is saved immediately.
+            </li>
+            <li>
+              Review the result and, if needed,{' '}
+              <span className="text-foreground font-medium">edit the content manually</span>{' '}
+              for small corrections — no need to re-run research for typos or
+              minor tweaks.
+            </li>
+            <li>
+              For AI documents, use{' '}
               <span className="text-foreground font-medium">Refresh Content</span>{' '}
-              periodically to keep the knowledge up to date.
+              periodically to keep the knowledge up to date (this will overwrite
+              any manual edits). Manual documents are not refreshed.
             </li>
             <li>Open the chat — your knowledge is now grounding every reply.</li>
           </ol>
@@ -222,7 +284,22 @@ export default function HelpPanel() {
             </li>
             <li>
               <span className="text-foreground font-medium">Refresh</span>{' '}
-              documents whose subject evolves (news, product docs, market data).
+              AI documents whose subject evolves (news, product docs, market
+              data).
+            </li>
+            <li>
+              Prefer{' '}
+              <span className="text-foreground font-medium">manual edits</span>{' '}
+              for small fixes (typos, outdated details, pruning). Remember that
+              Refresh Content overwrites manual changes on AI documents, so
+              re-apply them if you regenerate.
+            </li>
+            <li>
+              Use{' '}
+              <span className="text-foreground font-medium">Manual</span>{' '}
+              document types for content the AI cannot research (internal
+              policies, private notes, curated specifics) and keep AI types
+              for public, searchable subjects.
             </li>
             <li>
               Reuse a single Document Type across many documents to keep your

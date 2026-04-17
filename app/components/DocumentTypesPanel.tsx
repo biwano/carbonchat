@@ -5,30 +5,43 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit, Save, X, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, ChevronDown, Sparkles, User } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
+import AiBadge from "./AiBadge";
 
 interface DocumentType {
   id: string;
   name: string;
   transformation_instructions: string;
   description?: string;
+  ai: boolean;
 }
+
+interface FormData {
+  name: string;
+  transformation_instructions: string;
+  description: string;
+  ai: boolean;
+}
+
+const EMPTY_FORM: FormData = {
+  name: '',
+  transformation_instructions: '',
+  description: '',
+  ai: true,
+};
 
 export default function DocumentTypesPanel() {
   const [types, setTypes] = useState<DocumentType[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    transformation_instructions: '',
-    description: ''
-  });
+  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
 
   const fetchTypes = async () => {
     const { data, error } = await supabase
@@ -45,14 +58,20 @@ export default function DocumentTypesPanel() {
   }, []);
 
   const handleCreate = async () => {
-    if (!formData.name || !formData.transformation_instructions) return;
+    if (!formData.name) return;
+    if (formData.ai && !formData.transformation_instructions) return;
+
+    const payload = {
+      ...formData,
+      transformation_instructions: formData.ai ? formData.transformation_instructions : '',
+    };
 
     const { error } = await supabase
       .from('document_types')
-      .insert([formData]);
+      .insert([payload]);
 
     if (!error) {
-      setFormData({ name: '', transformation_instructions: '', description: '' });
+      setFormData(EMPTY_FORM);
       setIsCreating(false);
       fetchTypes();
     } else {
@@ -61,16 +80,22 @@ export default function DocumentTypesPanel() {
   };
 
   const handleUpdate = async (id: string) => {
-    if (!formData.name || !formData.transformation_instructions) return;
+    if (!formData.name) return;
+    if (formData.ai && !formData.transformation_instructions) return;
+
+    const payload = {
+      ...formData,
+      transformation_instructions: formData.ai ? formData.transformation_instructions : '',
+    };
 
     const { error } = await supabase
       .from('document_types')
-      .update(formData)
+      .update(payload)
       .eq('id', id);
 
     if (!error) {
       setEditingId(null);
-      setFormData({ name: '', transformation_instructions: '', description: '' });
+      setFormData(EMPTY_FORM);
       fetchTypes();
     } else {
       console.error('Error updating type:', error);
@@ -97,7 +122,8 @@ export default function DocumentTypesPanel() {
     setFormData({
       name: type.name,
       transformation_instructions: type.transformation_instructions,
-      description: type.description || ''
+      description: type.description || '',
+      ai: type.ai
     });
     setIsCreating(false);
   };
@@ -105,7 +131,7 @@ export default function DocumentTypesPanel() {
   const cancelAction = () => {
     setIsCreating(false);
     setEditingId(null);
-    setFormData({ name: '', transformation_instructions: '', description: '' });
+    setFormData(EMPTY_FORM);
   };
 
   return (
@@ -145,15 +171,35 @@ export default function DocumentTypesPanel() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Transformation Instructions</label>
-              <Textarea
-                placeholder="Tell the AI exactly how to process the research..."
-                rows={6}
-                value={formData.transformation_instructions}
-                onChange={(e) => setFormData({ ...formData, transformation_instructions: e.target.value })}
+            <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+              <div className="space-y-0.5">
+                <label htmlFor="ai-toggle" className="text-sm font-medium flex items-center gap-2">
+                  {formData.ai ? <Sparkles className="w-4 h-4 text-primary" /> : <User className="w-4 h-4 text-muted-foreground" />}
+                  AI-researched
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  {formData.ai
+                    ? 'Documents of this type are researched and generated by the AI from a search query.'
+                    : 'Documents of this type are authored manually; their content is written directly by the user.'}
+                </p>
+              </div>
+              <Switch
+                id="ai-toggle"
+                checked={formData.ai}
+                onCheckedChange={(checked: boolean) => setFormData({ ...formData, ai: checked })}
               />
             </div>
+            {formData.ai && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Transformation Instructions</label>
+                <Textarea
+                  placeholder="Tell the AI exactly how to process the research..."
+                  rows={6}
+                  value={formData.transformation_instructions}
+                  onChange={(e) => setFormData({ ...formData, transformation_instructions: e.target.value })}
+                />
+              </div>
+            )}
             <div className="flex gap-3 pt-2">
               {editingId ? (
                 <Button onClick={() => handleUpdate(editingId)}>
@@ -181,7 +227,10 @@ export default function DocumentTypesPanel() {
             <Card key={type.id} className="border border-border">
               <CardHeader>
                 <div className="flex justify-between">
-                  <CardTitle className="text-lg">{type.name}</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    {type.name}
+                    <AiBadge ai={type.ai} />
+                  </CardTitle>
                   <div className="flex gap-2">
                     <Button 
                       variant="ghost" 
@@ -203,22 +252,24 @@ export default function DocumentTypesPanel() {
               </CardHeader>
               <CardContent>
                 {type.description && <p className="text-sm text-muted-foreground mb-3">{type.description}</p>}
-                
-                <Collapsible>
-                  <CollapsibleTrigger
-                    render={
-                      <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
-                    }
-                  >
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transformation Instructions</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-2">
-                    <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">
-                      {type.transformation_instructions}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
+
+                {type.ai && (
+                  <Collapsible>
+                    <CollapsibleTrigger
+                      render={
+                        <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
+                      }
+                    >
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transformation Instructions</span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">
+                        {type.transformation_instructions}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
               </CardContent>
             </Card>
           )
