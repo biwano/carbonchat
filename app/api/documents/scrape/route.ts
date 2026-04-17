@@ -98,19 +98,26 @@ export async function POST(request: NextRequest) {
       max_tokens: 8000,
     });
 
-    const responseText = completion.choices[0]?.message?.content || '';
-    let generatedContent = 'Failed to generate content.';
+    const responseText = completion.choices[0]?.message?.content;
+    
+    if (!responseText) {
+      return NextResponse.json({ error: 'AI failed to generate any content' }, { status: 500 });
+    }
+
+    let generatedContent = '';
     let generatedSources = '';
 
-    if (responseText) {
-      try {
-        const parsedResponse = JSON.parse(responseText);
-        generatedContent = parsedResponse.content || responseText;
-        generatedSources = parsedResponse.sources || '';
-      } catch (e) {
-        console.warn('Failed to parse AI response as JSON, falling back to raw text:', e);
-        generatedContent = responseText;
-      }
+    try {
+      const parsedResponse = JSON.parse(responseText);
+      generatedContent = parsedResponse.content;
+      generatedSources = parsedResponse.sources || '';
+    } catch (e) {
+      console.warn('Failed to parse AI response as JSON, falling back to raw text:', e);
+      generatedContent = responseText;
+    }
+
+    if (!generatedContent) {
+      return NextResponse.json({ error: 'AI generated empty content' }, { status: 500 });
     }
 
     // Update the existing document's content, sources, updated_at, and metadata
@@ -119,7 +126,6 @@ export async function POST(request: NextRequest) {
       .update({
         content: generatedContent,
         sources: generatedSources,
-        updated_at: new Date().toISOString(),
         metadata: {
           model: completion.model,
           tokens: completion.usage,

@@ -214,7 +214,6 @@ export default function DocumentsPanel() {
       subject_id: selectedTypeIsAi ? formData.subject_id : null,
       content: formData.content,
       sources: formData.sources,
-      updated_at: editingDocument ? new Date().toISOString() : undefined
     };
 
     if (editingDocument) {
