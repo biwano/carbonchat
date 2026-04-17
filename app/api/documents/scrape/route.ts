@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     Details: ${subject.content}
     ${additionalSources ? `\n**Additional Sources to Research and Browse:**\n${additionalSources}` : ''}
     
-    Focus on creating a "definitive guide" style entry that is immediately useful for the knowledge base.
+    Focus on creating a "definitive guide" style entry that is immediately useful and accurate.
     `;
     
     // Call OpenRouter (via OpenAI SDK) - using cheapest good model

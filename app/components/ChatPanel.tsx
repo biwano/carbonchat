@@ -17,7 +17,7 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hello! I'm Carbonchat. I have access to a knowledge base built from internet research. Ask me anything!"
+      content: "Hello! I'm Carbonchat. Ask me anything!"
     }
   ]);
   const [input, setInput] = useState('');
@@ -50,9 +50,13 @@ export default function ChatPanel() {
     if (!input.trim() || isStreaming) return;
 
     const userMessage = input.trim();
-    setMessages(prev => [
-      ...prev,
+    const newMessages: Message[] = [
+      ...messages,
       { role: 'user', content: userMessage },
+    ];
+    
+    setMessages([
+      ...newMessages,
       { role: 'assistant', content: '', error: null },
     ]);
     setInput('');
@@ -65,7 +69,12 @@ export default function ChatPanel() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({ 
+          messages: newMessages.map(m => ({
+            role: m.role,
+            content: m.content
+          }))
+        }),
         signal: controller.signal,
       });
 
@@ -181,13 +190,13 @@ export default function ChatPanel() {
                 {message.role === 'assistant' && (
                   <div className="flex items-center gap-2 mb-2 text-primary">
                     <Bot className="w-4 h-4" />
-                    <span className="text-xs font-medium">KNOWLEDGE BOT</span>
+                    <span className="text-xs font-medium">ASSISTANT</span>
                     {isLastAssistant && isStreaming && (
                       <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                     )}
                   </div>
                 )}
-                <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                <div className="text-sm leading-relaxed whitespace-pre-wrap">
                   {message.content}
                   {isLastAssistant && isStreaming && message.content.length > 0 && (
                     <span className="inline-block w-2 h-4 ml-0.5 align-[-2px] bg-foreground/70 animate-pulse" />
@@ -214,7 +223,7 @@ export default function ChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question... (The bot will use all available knowledge as context)"
+            placeholder="Ask a question..."
             className="min-h-[60px] bg-muted border-border resize-y"
             disabled={isStreaming}
           />
@@ -238,9 +247,6 @@ export default function ChatPanel() {
             </Button>
           )}
         </div>
-        <p className="text-[10px] text-center text-muted-foreground mt-3">
-          All documents in the knowledge base are automatically injected as context
-        </p>
       </div>
     </div>
   );

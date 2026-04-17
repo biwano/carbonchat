@@ -16,7 +16,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-2xl font-semibold text-foreground">Carbonchat</h1>
-              <p className="text-xs text-muted-foreground -mt-1">Knowledge Chatbot</p>
+              <p className="text-xs text-muted-foreground -mt-1">AI Assistant</p>
             </div>
           </div>
           

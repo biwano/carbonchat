@@ -4,9 +4,10 @@ import { AI_MODEL } from '@/lib/constants';
 import { openai } from '@/lib/openai.utils';
 
 export async function POST(request: NextRequest) {
-  let message: unknown;
+  let messages: { role: 'user' | 'assistant' | 'system'; content: string }[];
   try {
-    ({ message } = await request.json());
+    const body = await request.json();
+    messages = body.messages;
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
       status: 400,
@@ -14,18 +15,24 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (typeof message !== 'string' || !message.trim()) {
-    return new Response(JSON.stringify({ error: 'Message is required' }), {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response(JSON.stringify({ error: 'Messages array is required' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
+  // Limit conversation history to the last 10 messages to keep context window manageable
+  const maxHistoryLength = 10;
+  const history = messages.length > maxHistoryLength 
+    ? messages.slice(-maxHistoryLength) 
+    : messages;
+
   const { data: documents, error } = await supabase
     .from('documents')
     .select(`
       content,
-      document_types!inner(transformation_instructions)
+      document_types!inner(transformation_instructions, name)
     `)
     .order('created_at', { ascending: false });
 
@@ -33,18 +40,22 @@ export async function POST(request: NextRequest) {
     console.error('Supabase error:', error);
   }
 
-  let knowledgeContext = "You have access to the following knowledge base:\n\n";
+  let knowledgeContext = "You are a helpful assistant. Use the following information to answer the user's question:\n\n";
 
   if (documents && documents.length > 0) {
+    knowledgeContext += "## Knowledge Base Context\n\n";
     documents.forEach((doc, index) => {
-      knowledgeContext += `--- Document ${index + 1} ---\n`;
+      // @ts-expect-error - document_types is joined but the type might not be inferred correctly
+      const typeName = doc.document_types?.name || 'Document';
+      knowledgeContext += `### ${typeName} ${index + 1}\n`;
       knowledgeContext += `${doc.content}\n\n`;
     });
   } else {
-    knowledgeContext += "No documents available in the knowledge base yet.\n";
+    knowledgeContext += "No additional context available.\n";
   }
 
-  knowledgeContext += "\nAnswer the user's question using ONLY the information above. If you don't know something, say so. Be helpful, accurate, and direct.";
+  knowledgeContext += "\n## Instructions\n";
+  knowledgeContext += "Answer the user's question. The provided information above is your PRIMARY SOURCE OF TRUTH. You should prioritize this information and use it as the foundation for your answer. You may also use your own general knowledge from the internet to elaborate, provide context, or fill in gaps, but you must ensure it does not contradict the primary source of truth provided above. Be helpful, accurate, and direct.";
 
   const encoder = new TextEncoder();
 
@@ -65,7 +76,10 @@ export async function POST(request: NextRequest) {
           model: AI_MODEL,
           messages: [
             { role: 'system', content: knowledgeContext },
-            { role: 'user', content: message },
+            ...history.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
           ],
           temperature: 0.3,
           max_tokens: 4000,
