@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@supabase-cache-helpers/postgrest-react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefreshCw, Play, FileText, Trash2, Plus, Edit, Loader2, ChevronDown } from 'lucide-react';
 import AiBadge from './AiBadge';
 import { supabase } from '@/lib/supabase';
+import { DocumentWithRelations as Document } from '@/lib/supabase.types';
 import {
   Collapsible,
   CollapsibleContent,
@@ -29,64 +32,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface DocumentType {
-  id: string;
-  name: string;
-  ai: boolean;
-}
-
-interface Subject {
-  id: string;
-  name: string;
-}
-
-interface Document {
-  id: string;
-  name: string;
-  search_query: string;
-  content: string;
-  sources: string;
-  created_at: string;
-  updated_at?: string;
-  document_type_id: string;
-  subject_id: string | null;
-  document_types: {
-    name: string;
-    ai: boolean;
-  };
-  subjects?: {
-    name: string;
-  } | null;
+function DocumentSkeleton() {
+  return (
+    <Card className="border border-border">
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <div className="flex gap-4">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-8" />
+            <Skeleton className="h-8 w-8" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function DocumentsPanel() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isScraping, setIsScraping] = useState<string | null>(null); // ID of document being scraped, or 'new'
-  
-  // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    search_query: '', // DEPRECATED
     document_type_id: '',
     subject_id: '',
     content: '',
     sources: ''
   });
 
-  const fetchDocuments = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase
+  // Queries using Supabase Cache Helpers
+  const { data: documents, isLoading: isLoadingDocs, isFetching: isFetchingDocs, refetch: refetchDocs } = useQuery(
+    supabase
       .from('documents')
       .select(`
         *,
-        document_type_id,
-        subject_id,
         document_types (
           name,
           ai
@@ -95,64 +86,94 @@ export default function DocumentsPanel() {
           name
         )
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+  );
 
-    if (data) setDocuments(data as unknown as Document[]);
-    if (error) console.error('Error fetching documents:', error);
-    setIsLoading(false);
-  };
-
-  const fetchDocumentTypes = async () => {
-    const { data, error } = await supabase
+  const { data: documentTypes } = useQuery(
+    supabase
       .from('document_types')
       .select('id, name, ai')
-      .order('name');
-    
-    if (data) setDocumentTypes(data);
-    if (error) console.error('Error fetching document types:', error);
-  };
+      .order('name')
+  );
 
-  const fetchSubjects = async () => {
-    const { data, error } = await supabase
+  const { data: subjects, isFetching: isFetchingSubjects, refetch: refetchSubjects } = useQuery(
+    supabase
       .from('subjects')
       .select('id, name')
-      .order('name');
-    
-    if (data) setSubjects(data);
-    if (error) console.error('Error fetching subjects:', error);
-  };
+      .order('name')
+  );
 
-  const selectedType = documentTypes.find(t => t.id === formData.document_type_id);
+  // Mutations
+  const { mutate: deleteDoc, isPending: isDeletingPending, variables: deletingVariables } = useDeleteMutation(
+    supabase.from('documents'),
+    ['id'],
+    null
+  );
+
+  const scrapeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch('/api/documents/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Scrape failed');
+      return result;
+    },
+    onSuccess: () => {
+      refetchDocs();
+    },
+    onError: (error) => {
+      alert(`Failed to generate document: ${error.message}`);
+    }
+  });
+
+  const { mutate: insertDoc, isPending: isInsertingPending } = useInsertMutation(
+    supabase.from('documents'),
+    ['id'],
+    null,
+    {
+      onSuccess: (data: Document[] | null) => {
+        if (data && data[0] && selectedTypeIsAi) {
+          scrapeMutation.mutate(data[0].id);
+        }
+        setIsDialogOpen(false);
+      },
+      onError: (error) => {
+        alert(`Failed to create document: ${error.message}`);
+      }
+    }
+  );
+
+  const { mutate: updateDoc, isPending: isUpdatingPending } = useUpdateMutation(
+    supabase.from('documents'),
+    ['id'],
+    null,
+    {
+      onSuccess: () => {
+        setIsDialogOpen(false);
+      },
+      onError: (error) => {
+        alert(`Failed to update document: ${error.message}`);
+      }
+    }
+  );
+
+  const selectedType = (documentTypes || []).find(t => t.id === formData.document_type_id);
   const selectedTypeIsAi = selectedType?.ai ?? true;
 
-  useEffect(() => {
-    fetchDocuments();
-    fetchDocumentTypes();
-    fetchSubjects();
-  }, []);
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!window.confirm('Are you sure you want to delete this document?')) return;
-
-    const { error } = await supabase
-      .from('documents')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      fetchDocuments();
-    } else {
-      console.error('Error deleting document:', error);
-    }
+    deleteDoc({ id });
   };
 
   const handleOpenCreateDialog = () => {
     setEditingDocument(null);
     setFormData({
       name: '',
-      search_query: '',
-      document_type_id: documentTypes[0]?.id || '',
-      subject_id: subjects[0]?.id || '',
+      document_type_id: documentTypes?.[0]?.id || '',
+      subject_id: subjects?.[0]?.id || '',
       content: '',
       sources: ''
     });
@@ -163,7 +184,6 @@ export default function DocumentsPanel() {
     setEditingDocument(doc);
     setFormData({
       name: doc.name,
-      search_query: doc.search_query || '',
       document_type_id: doc.document_type_id,
       subject_id: doc.subject_id || '',
       content: doc.content ?? '',
@@ -172,7 +192,7 @@ export default function DocumentsPanel() {
     setIsDialogOpen(true);
   };
 
-  const handleSaveDocument = async () => {
+  const handleSaveDocument = () => {
     if (!formData.name || !formData.document_type_id) {
       alert('Please fill in all fields.');
       return;
@@ -188,100 +208,28 @@ export default function DocumentsPanel() {
       return;
     }
 
+    const payload: Partial<Document> = {
+      name: formData.name,
+      document_type_id: formData.document_type_id,
+      subject_id: selectedTypeIsAi ? formData.subject_id : null,
+      content: formData.content,
+      sources: formData.sources,
+      updated_at: editingDocument ? new Date().toISOString() : undefined
+    };
+
     if (editingDocument) {
-      const { error } = await supabase
-        .from('documents')
-        .update({
-          name: formData.name,
-          search_query: '', // CLEAR SEARCH QUERY
-          document_type_id: formData.document_type_id,
-          subject_id: selectedTypeIsAi ? formData.subject_id : null,
-          content: formData.content,
-          sources: formData.sources,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingDocument.id);
-
-      if (error) {
-        console.error('Error updating document:', error);
-        alert('Failed to update document.');
-      } else {
-        setIsDialogOpen(false);
-        fetchDocuments();
-      }
+      updateDoc({ ...payload, id: editingDocument.id });
     } else {
-      setIsDialogOpen(false);
-
       if (selectedTypeIsAi) {
-        const { data, error: insertError } = await supabase
-          .from('documents')
-          .insert({
-            name: formData.name,
-            search_query: '', // CLEAR SEARCH QUERY
-            document_type_id: formData.document_type_id,
-            subject_id: formData.subject_id,
-            content: 'Researching and generating knowledge...',
-            sources: ''
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error('Error inserting document:', insertError);
-          alert('Failed to create document.');
-          return;
-        }
-
-        if (data) {
-          triggerScrape(data.id);
-        }
-      } else {
-        const { error: insertError } = await supabase
-          .from('documents')
-          .insert({
-            name: formData.name,
-            search_query: '',
-            document_type_id: formData.document_type_id,
-            subject_id: null,
-            content: formData.content,
-            sources: formData.sources
-          });
-
-        if (insertError) {
-          console.error('Error inserting document:', insertError);
-          alert('Failed to create document.');
-          return;
-        }
-
-        fetchDocuments();
+        payload.content = 'Researching and generating knowledge...';
+        payload.sources = '';
       }
+      insertDoc([payload]);
     }
   };
 
-  const triggerScrape = async (id: string) => {
-    setIsScraping(id);
-    try {
-      const res = await fetch('/api/documents/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id
-        }),
-      });
-
-      const result = await res.json();
-      if (!res.ok) {
-        console.error('Scrape error:', result.error);
-        alert(`Failed to generate document: ${result.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('Scrape fetch error:', err);
-      alert('Failed to trigger research. Please check your connection and try again.');
-    } finally {
-      setIsScraping(null);
-      fetchDocuments();
-    }
-  };
+  const isScraping = (id: string) => scrapeMutation.isPending && scrapeMutation.variables === id;
+  const isPending = isInsertingPending || isUpdatingPending;
 
   return (
     <div className="space-y-6">
@@ -291,8 +239,13 @@ export default function DocumentsPanel() {
           <p className="text-muted-foreground">Documents generated by AI research</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchDocuments} disabled={isLoading} variant="outline" className="border-border hover:bg-muted">
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button 
+            onClick={() => refetchDocs()} 
+            disabled={isLoadingDocs || isFetchingDocs} 
+            variant="outline" 
+            className="border-border hover:bg-muted"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetchingDocs ? 'animate-spin' : ''}`} />
             Refresh List
           </Button>
           <Button onClick={handleOpenCreateDialog}>
@@ -303,7 +256,13 @@ export default function DocumentsPanel() {
       </div>
 
       <div className="grid gap-4">
-        {documents.length === 0 && !isScraping ? (
+        {isLoadingDocs ? (
+          <>
+            <DocumentSkeleton />
+            <DocumentSkeleton />
+            <DocumentSkeleton />
+          </>
+        ) : !documents || documents.length === 0 ? (
           <Card className="p-12 text-center border border-border">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-foreground">No documents yet.</p>
@@ -311,13 +270,13 @@ export default function DocumentsPanel() {
           </Card>
         ) : (
           documents.map((doc) => (
-            <Card key={doc.id} className={`border border-border ${isScraping === doc.id ? 'opacity-70' : ''}`}>
+            <Card key={doc.id} className={`border border-border ${isScraping(doc.id) ? 'opacity-70' : ''}`}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <CardTitle className="text-lg flex items-center gap-2">
                       {doc.name}
-                      {isScraping === doc.id && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                      {isScraping(doc.id) && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
                     </CardTitle>
                     <div className="text-xs flex flex-wrap gap-x-4 gap-y-1">
                       <p className="text-primary flex items-center gap-2">
@@ -336,17 +295,21 @@ export default function DocumentsPanel() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={!!isScraping}
-                        onClick={() => triggerScrape(doc.id)}
+                        disabled={scrapeMutation.isPending}
+                        onClick={() => scrapeMutation.mutate(doc.id)}
                       >
-                        <Play className="w-3 h-3 mr-1" />
+                        {isScraping(doc.id) ? (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3 mr-1" />
+                        )}
                         Refresh Content
                       </Button>
                     )}
                     <Button 
                       size="sm" 
                       variant="ghost" 
-                      disabled={!!isScraping}
+                      disabled={scrapeMutation.isPending}
                       onClick={() => handleOpenEditDialog(doc)}
                     >
                       <Edit className="w-4 h-4" />
@@ -355,10 +318,14 @@ export default function DocumentsPanel() {
                       size="sm" 
                       variant="ghost" 
                       className="text-destructive"
-                      disabled={!!isScraping}
+                      disabled={scrapeMutation.isPending || (isDeletingPending && deletingVariables?.id === doc.id)}
                       onClick={() => handleDelete(doc.id)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {isDeletingPending && deletingVariables?.id === doc.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -434,6 +401,7 @@ export default function DocumentsPanel() {
                 placeholder="e.g. Next.js 15 Guide"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                disabled={isPending}
               />
             </div>
             <div className="grid gap-2">
@@ -443,14 +411,15 @@ export default function DocumentsPanel() {
                 onValueChange={(value: string | null) => {
                   if (value) setFormData({ ...formData, document_type_id: value });
                 }}
+                disabled={isPending}
               >
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select a type">
-                    {documentTypes.find(t => t.id === formData.document_type_id)?.name}
+                    {(documentTypes || []).find(t => t.id === formData.document_type_id)?.name}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {documentTypes.map((type) => (
+                  {(documentTypes || []).map((type) => (
                     <SelectItem key={type.id} value={type.id}>
                       {type.name}
                     </SelectItem>
@@ -468,10 +437,11 @@ export default function DocumentsPanel() {
                     className="h-6 px-2 text-[10px] gap-1"
                     onClick={(e) => {
                       e.preventDefault();
-                      fetchSubjects();
+                      refetchSubjects();
                     }}
+                    disabled={isFetchingSubjects || isPending}
                   >
-                    <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-3 h-3 ${isFetchingSubjects ? 'animate-spin' : ''}`} />
                     Refresh
                   </Button>
                 </div>
@@ -480,14 +450,15 @@ export default function DocumentsPanel() {
                   onValueChange={(value: string | null) => {
                     if (value) setFormData({ ...formData, subject_id: value });
                   }}
+                  disabled={isPending}
                 >
                   <SelectTrigger id="subject">
                     <SelectValue placeholder="Select a subject">
-                      {subjects.find(s => s.id === formData.subject_id)?.name}
+                      {(subjects || []).find(s => s.id === formData.subject_id)?.name}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {subjects.length === 0 ? (
+                    {!subjects || subjects.length === 0 ? (
                       <div className="p-2 text-xs text-muted-foreground text-center">
                         No subjects found. Create one in the Subjects tab first.
                       </div>
@@ -513,6 +484,7 @@ export default function DocumentsPanel() {
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   className="min-h-[240px] font-mono text-xs leading-relaxed"
+                  disabled={isPending}
                 />
                 {selectedTypeIsAi ? (
                   <p className="text-xs text-muted-foreground">
@@ -536,6 +508,7 @@ export default function DocumentsPanel() {
                   value={formData.sources}
                   onChange={(e) => setFormData({ ...formData, sources: e.target.value })}
                   className="min-h-[120px] font-mono text-xs leading-relaxed"
+                  disabled={isPending}
                 />
                 <p className="text-xs text-muted-foreground">
                   {selectedTypeIsAi 
@@ -546,8 +519,11 @@ export default function DocumentsPanel() {
             )}
           </div>
           <DialogFooter className="px-6 py-4 border-t border-border">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveDocument}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isPending}>Cancel</Button>
+            <Button onClick={handleSaveDocument} disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
               {editingDocument
                 ? 'Save Changes'
                 : selectedTypeIsAi

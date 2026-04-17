@@ -13,14 +13,32 @@ export type Database = {
           id: string
           name: string
           transformation_instructions: string
+          additional_sources: string | null
           description?: string
+          ai: boolean
           created_at: string
         }
         Insert: {
           id?: string
           name: string
           transformation_instructions: string
+          additional_sources?: string | null
           description?: string
+          ai?: boolean
+          created_at?: string
+        }
+      }
+      subjects: {
+        Row: {
+          id: string
+          name: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          content: string
           created_at?: string
         }
       }
@@ -29,8 +47,9 @@ export type Database = {
           id: string
           name: string
           document_type_id: string
-          search_query: string
+          subject_id: string | null
           content: string
+          sources: string | null
           created_at: string
           updated_at: string
           metadata?: Record<string, unknown>
@@ -39,8 +58,9 @@ export type Database = {
           id?: string
           name: string
           document_type_id: string
-          search_query: string
+          subject_id?: string | null
           content?: string
+          sources?: string | null
           created_at?: string
           updated_at?: string
           metadata?: Record<string, unknown>

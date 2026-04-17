@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { DocumentType, Subject } from '@/lib/supabase.types';
 import { AI_MODEL } from '@/lib/constants';
 import { openai } from '@/lib/openai.utils';
 
@@ -41,8 +42,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const documentType = document.document_types as unknown as { ai: boolean; transformation_instructions: string; additional_sources: string } | null;
-    const subject = document.subjects as unknown as { name: string; content: string } | null;
+    const documentType = document.document_types as unknown as Pick<DocumentType, 'ai' | 'transformation_instructions' | 'additional_sources'> | null;
+    const subject = document.subjects as unknown as Pick<Subject, 'name' | 'content'> | null;
     const transformationInstructions = documentType?.transformation_instructions;
     const additionalSources = documentType?.additional_sources;
 

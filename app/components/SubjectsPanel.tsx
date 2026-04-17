@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@supabase-cache-helpers/postgrest-react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Plus, Edit, Trash2, FileText } from 'lucide-react';
+import { RefreshCw, Plus, Edit, Trash2, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { Subject } from '@/lib/supabase.types';
 import {
   Dialog,
   DialogContent,
@@ -16,17 +18,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface Subject {
-  id: string;
-  name: string;
-  content: string;
-  created_at: string;
+function SubjectSkeleton() {
+  return (
+    <Card className="border border-border flex flex-col">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+        <Skeleton className="h-6 w-32" />
+        <div className="flex gap-1">
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-8 w-8" />
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1">
+        <Skeleton className="h-24 w-full" />
+        <div className="mt-4">
+          <Skeleton className="h-3 w-20" />
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function SubjectsPanel() {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [formData, setFormData] = useState({
@@ -34,36 +48,46 @@ export default function SubjectsPanel() {
     content: ''
   });
 
-  const fetchSubjects = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase
+  // Queries using Supabase Cache Helpers
+  const { data: subjects, isLoading, isFetching, refetch } = useQuery(
+    supabase
       .from('subjects')
       .select('*')
-      .order('name');
-    
-    if (data) setSubjects(data);
-    if (error) console.error('Error fetching subjects:', error);
-    setIsLoading(false);
-  };
+      .order('name')
+  );
 
-  useEffect(() => {
-    fetchSubjects();
-  }, []);
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this subject? Documents using it will be unlinked.')) return;
-
-    const { error } = await supabase
-      .from('subjects')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      fetchSubjects();
-    } else {
-      console.error('Error deleting subject:', error);
-      alert('Failed to delete subject.');
+  // Mutations using Supabase Cache Helpers
+  const { mutate: create, isPending: isCreatingPending } = useInsertMutation(
+    supabase.from('subjects'),
+    ['id'],
+    null,
+    {
+      onSuccess: () => {
+        setIsDialogOpen(false);
+      },
     }
+  );
+
+  const { mutate: update, isPending: isUpdatingPending } = useUpdateMutation(
+    supabase.from('subjects'),
+    ['id'],
+    null,
+    {
+      onSuccess: () => {
+        setIsDialogOpen(false);
+      },
+    }
+  );
+
+  const { mutate: deleteSubject, isPending: isDeletingPending, variables: deletingVariables } = useDeleteMutation(
+    supabase.from('subjects'),
+    ['id'],
+    null
+  );
+
+  const handleDelete = (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this subject? Documents using it will be unlinked.')) return;
+    deleteSubject({ id });
   };
 
   const handleOpenCreateDialog = () => {
@@ -84,43 +108,23 @@ export default function SubjectsPanel() {
     setIsDialogOpen(true);
   };
 
-  const handleSaveSubject = async () => {
+  const handleSaveSubject = () => {
     if (!formData.name || !formData.content) {
       alert('Please fill in all fields.');
       return;
     }
 
     if (editingSubject) {
-      const { error } = await supabase
-        .from('subjects')
-        .update({
-          name: formData.name,
-          content: formData.content
-        })
-        .eq('id', editingSubject.id);
-
-      if (error) {
-        console.error('Error updating subject:', error);
-        alert('Failed to update subject.');
-      } else {
-        setIsDialogOpen(false);
-        fetchSubjects();
-      }
+      update({
+        id: editingSubject.id,
+        name: formData.name,
+        content: formData.content
+      });
     } else {
-      const { error } = await supabase
-        .from('subjects')
-        .insert({
-          name: formData.name,
-          content: formData.content
-        });
-
-      if (error) {
-        console.error('Error inserting subject:', error);
-        alert('Failed to create subject.');
-      } else {
-        setIsDialogOpen(false);
-        fetchSubjects();
-      }
+      create([{
+        name: formData.name,
+        content: formData.content
+      }]);
     }
   };
 
@@ -132,8 +136,13 @@ export default function SubjectsPanel() {
           <p className="text-muted-foreground">Topics and sources for AI research</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchSubjects} disabled={isLoading} variant="outline" className="border-border hover:bg-muted">
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button 
+            onClick={() => refetch()} 
+            disabled={isLoading || isFetching} 
+            variant="outline" 
+            className="border-border hover:bg-muted"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button onClick={handleOpenCreateDialog}>
@@ -144,7 +153,13 @@ export default function SubjectsPanel() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {subjects.length === 0 ? (
+        {isLoading ? (
+          <>
+            <SubjectSkeleton />
+            <SubjectSkeleton />
+            <SubjectSkeleton />
+          </>
+        ) : !subjects || subjects.length === 0 ? (
           <Card className="p-12 text-center border border-border col-span-full">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-foreground">No subjects yet.</p>
@@ -156,11 +171,26 @@ export default function SubjectsPanel() {
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-bold">{subject.name}</CardTitle>
                 <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => handleOpenEditDialog(subject)}>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    onClick={() => handleOpenEditDialog(subject)}
+                    disabled={isDeletingPending}
+                  >
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(subject.id)}>
-                    <Trash2 className="w-4 h-4" />
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="text-destructive" 
+                    onClick={() => handleDelete(subject.id)}
+                    disabled={isDeletingPending}
+                  >
+                    {isDeletingPending && deletingVariables?.id === subject.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </CardHeader>
@@ -193,6 +223,7 @@ export default function SubjectsPanel() {
                 placeholder="e.g. Next.js 15, Global Warming, etc."
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                disabled={isCreatingPending || isUpdatingPending}
               />
             </div>
             <div className="grid gap-2">
@@ -203,6 +234,7 @@ export default function SubjectsPanel() {
                 value={formData.content}
                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                 className="min-h-[200px]"
+                disabled={isCreatingPending || isUpdatingPending}
               />
               <p className="text-xs text-muted-foreground">
                 This content tells the AI **what** to talk about. The Document Type tells it **how** to talk about it.
@@ -210,8 +242,11 @@ export default function SubjectsPanel() {
             </div>
           </div>
           <DialogFooter className="px-6 py-4 border-t border-border">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveSubject}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isCreatingPending || isUpdatingPending}>Cancel</Button>
+            <Button onClick={handleSaveSubject} disabled={isCreatingPending || isUpdatingPending}>
+              {isCreatingPending || isUpdatingPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
               {editingSubject ? 'Save Changes' : 'Create Subject'}
             </Button>
           </DialogFooter>

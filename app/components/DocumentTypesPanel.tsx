@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@supabase-cache-helpers/postgrest-react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit, Save, X, ChevronDown, Sparkles, User } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, ChevronDown, Sparkles, User, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { DocumentType } from '@/lib/supabase.types';
 import {
   Collapsible,
   CollapsibleContent,
@@ -14,15 +16,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import AiBadge from "./AiBadge";
-
-interface DocumentType {
-  id: string;
-  name: string;
-  transformation_instructions: string;
-  additional_sources: string;
-  description?: string;
-  ai: boolean;
-}
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface FormData {
   name: string;
@@ -40,27 +34,74 @@ const EMPTY_FORM: FormData = {
   ai: true,
 };
 
+function DocumentTypeSkeleton() {
+  return (
+    <Card className="border border-border">
+      <CardHeader>
+        <div className="flex justify-between">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-5 w-16" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-8" />
+            <Skeleton className="h-8 w-8" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-8 w-full" />
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DocumentTypesPanel() {
-  const [types, setTypes] = useState<DocumentType[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
 
-  const fetchTypes = async () => {
-    const { data, error } = await supabase
+  // Queries using Supabase Cache Helpers
+  const { data: types, isLoading } = useQuery(
+    supabase
       .from('document_types')
       .select('*')
-      .order('name');
-    
-    if (data) setTypes(data);
-    if (error) console.error('Error fetching types:', error);
-  };
+      .order('name')
+  );
 
-  useEffect(() => {
-    fetchTypes();
-  }, []);
+  // Mutations using Supabase Cache Helpers
+  const { mutate: create, isPending: isCreatingPending } = useInsertMutation(
+    supabase.from('document_types'),
+    ['id'],
+    null,
+    {
+      onSuccess: () => {
+        setFormData(EMPTY_FORM);
+        setIsCreating(false);
+      },
+    }
+  );
 
-  const handleCreate = async () => {
+  const { mutate: update, isPending: isUpdatingPending } = useUpdateMutation(
+    supabase.from('document_types'),
+    ['id'],
+    null,
+    {
+      onSuccess: () => {
+        setEditingId(null);
+        setFormData(EMPTY_FORM);
+      },
+    }
+  );
+
+  const { mutate: deleteType, isPending: isDeletingPending, variables: deletingVariables } = useDeleteMutation(
+    supabase.from('document_types'),
+    ['id'],
+    null
+  );
+
+  const handleCreate = () => {
     if (!formData.name) return;
     if (formData.ai && !formData.transformation_instructions) return;
 
@@ -70,20 +111,10 @@ export default function DocumentTypesPanel() {
       additional_sources: formData.ai ? formData.additional_sources : '',
     };
 
-    const { error } = await supabase
-      .from('document_types')
-      .insert([payload]);
-
-    if (!error) {
-      setFormData(EMPTY_FORM);
-      setIsCreating(false);
-      fetchTypes();
-    } else {
-      console.error('Error creating type:', error);
-    }
+    create([payload]);
   };
 
-  const handleUpdate = async (id: string) => {
+  const handleUpdate = (id: string) => {
     if (!formData.name) return;
     if (formData.ai && !formData.transformation_instructions) return;
 
@@ -93,33 +124,12 @@ export default function DocumentTypesPanel() {
       additional_sources: formData.ai ? formData.additional_sources : '',
     };
 
-    const { error } = await supabase
-      .from('document_types')
-      .update(payload)
-      .eq('id', id);
-
-    if (!error) {
-      setEditingId(null);
-      setFormData(EMPTY_FORM);
-      fetchTypes();
-    } else {
-      console.error('Error updating type:', error);
-    }
+    update({ ...payload, id });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!window.confirm('Are you sure you want to delete this document type? This will also delete all associated documents.')) return;
-
-    const { error } = await supabase
-      .from('document_types')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      fetchTypes();
-    } else {
-      console.error('Error deleting type:', error);
-    }
+    deleteType({ id });
   };
 
   const startEditing = (type: DocumentType) => {
@@ -220,17 +230,31 @@ export default function DocumentTypesPanel() {
             )}
             <div className="flex gap-3 pt-2">
               {editingId ? (
-                <Button onClick={() => handleUpdate(editingId)}>
-                  <Save className="w-4 h-4 mr-2" />
+                <Button 
+                  onClick={() => handleUpdate(editingId)}
+                  disabled={isUpdatingPending}
+                >
+                  {isUpdatingPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
                   Save Changes
                 </Button>
               ) : (
-                <Button onClick={handleCreate}>
-                  <Plus className="w-4 h-4 mr-2" />
+                <Button 
+                  onClick={handleCreate}
+                  disabled={isCreatingPending}
+                >
+                  {isCreatingPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-2" />
+                  )}
                   Create Type
                 </Button>
               )}
-              <Button variant="outline" onClick={cancelAction}>
+              <Button variant="outline" onClick={cancelAction} disabled={isCreatingPending || isUpdatingPending}>
                 <X className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
@@ -240,39 +264,52 @@ export default function DocumentTypesPanel() {
       )}
 
       <div className="grid gap-4">
-        {types.map((type) => (
-          editingId !== type.id && (
-            <Card key={type.id} className="border border-border">
-              <CardHeader>
-                <div className="flex justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    {type.name}
-                    <AiBadge ai={type.ai} />
-                  </CardTitle>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => startEditing(type)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-destructive"
-                      onClick={() => handleDelete(type.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+        {isLoading ? (
+          <>
+            <DocumentTypeSkeleton />
+            <DocumentTypeSkeleton />
+            <DocumentTypeSkeleton />
+          </>
+        ) : (
+          (types || []).map((type) => (
+            editingId !== type.id && (
+              <Card key={type.id} className="border border-border">
+                <CardHeader>
+                  <div className="flex justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {type.name}
+                      <AiBadge ai={type.ai} />
+                    </CardTitle>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => startEditing(type)}
+                        disabled={isDeletingPending}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-destructive"
+                        onClick={() => handleDelete(type.id)}
+                        disabled={isDeletingPending}
+                      >
+                        {isDeletingPending && deletingVariables?.id === type.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {type.description && <p className="text-sm text-muted-foreground mb-3">{type.description}</p>}
+                </CardHeader>
+                <CardContent>
+                  {type.description && <p className="text-sm text-muted-foreground mb-3">{type.description}</p>}
 
-                {type.ai && (
-                  <div className="space-y-4">
+                  {type.ai && (
+                    <div className="space-y-4">
                     <Collapsible>
                       <CollapsibleTrigger
                         render={
@@ -283,26 +320,27 @@ export default function DocumentTypesPanel() {
                         <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-2">
-                        <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">
-                          {type.transformation_instructions}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
+                          <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">
+                            {type.transformation_instructions}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
 
-                    {type.additional_sources && (
-                      <div className="space-y-2">
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Additional Sources</span>
-                        <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
-                          {type.additional_sources}
+                      {type.additional_sources && (
+                        <div className="space-y-2">
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Additional Sources</span>
+                          <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
+                            {type.additional_sources}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )
-        ))}
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          ))
+        )}
       </div>
     </div>
   );
