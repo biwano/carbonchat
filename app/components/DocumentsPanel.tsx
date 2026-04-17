@@ -36,6 +36,11 @@ interface DocumentType {
   ai: boolean;
 }
 
+interface Subject {
+  id: string;
+  name: string;
+}
+
 interface Document {
   id: string;
   name: string;
@@ -44,15 +49,20 @@ interface Document {
   created_at: string;
   updated_at?: string;
   document_type_id: string;
+  subject_id: string | null;
   document_types: {
     name: string;
     ai: boolean;
   };
+  subjects?: {
+    name: string;
+  } | null;
 }
 
 export default function DocumentsPanel() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isScraping, setIsScraping] = useState<string | null>(null); // ID of document being scraped, or 'new'
   
@@ -61,8 +71,9 @@ export default function DocumentsPanel() {
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    search_query: '',
+    search_query: '', // DEPRECATED
     document_type_id: '',
+    subject_id: '',
     content: ''
   });
 
@@ -73,9 +84,13 @@ export default function DocumentsPanel() {
       .select(`
         *,
         document_type_id,
+        subject_id,
         document_types (
           name,
           ai
+        ),
+        subjects (
+          name
         )
       `)
       .order('created_at', { ascending: false });
@@ -95,12 +110,23 @@ export default function DocumentsPanel() {
     if (error) console.error('Error fetching document types:', error);
   };
 
+  const fetchSubjects = async () => {
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('id, name')
+      .order('name');
+    
+    if (data) setSubjects(data);
+    if (error) console.error('Error fetching subjects:', error);
+  };
+
   const selectedType = documentTypes.find(t => t.id === formData.document_type_id);
   const selectedTypeIsAi = selectedType?.ai ?? true;
 
   useEffect(() => {
     fetchDocuments();
     fetchDocumentTypes();
+    fetchSubjects();
   }, []);
 
   const handleDelete = async (id: string) => {
@@ -124,6 +150,7 @@ export default function DocumentsPanel() {
       name: '',
       search_query: '',
       document_type_id: documentTypes[0]?.id || '',
+      subject_id: subjects[0]?.id || '',
       content: ''
     });
     setIsDialogOpen(true);
@@ -133,8 +160,9 @@ export default function DocumentsPanel() {
     setEditingDocument(doc);
     setFormData({
       name: doc.name,
-      search_query: doc.search_query,
+      search_query: doc.search_query || '',
       document_type_id: doc.document_type_id,
+      subject_id: doc.subject_id || '',
       content: doc.content ?? ''
     });
     setIsDialogOpen(true);
@@ -146,8 +174,8 @@ export default function DocumentsPanel() {
       return;
     }
 
-    if (selectedTypeIsAi && !formData.search_query) {
-      alert('Please provide a search query for AI-researched documents.');
+    if (selectedTypeIsAi && !formData.subject_id) {
+      alert('Please select a subject for AI-researched documents.');
       return;
     }
 
@@ -161,8 +189,9 @@ export default function DocumentsPanel() {
         .from('documents')
         .update({
           name: formData.name,
-          search_query: selectedTypeIsAi ? formData.search_query : '',
+          search_query: '', // CLEAR SEARCH QUERY
           document_type_id: formData.document_type_id,
+          subject_id: selectedTypeIsAi ? formData.subject_id : null,
           content: formData.content,
           updated_at: new Date().toISOString()
         })
@@ -183,8 +212,9 @@ export default function DocumentsPanel() {
           .from('documents')
           .insert({
             name: formData.name,
-            search_query: formData.search_query,
+            search_query: '', // CLEAR SEARCH QUERY
             document_type_id: formData.document_type_id,
+            subject_id: formData.subject_id,
             content: 'Researching and generating knowledge...'
           })
           .select()
@@ -206,6 +236,7 @@ export default function DocumentsPanel() {
             name: formData.name,
             search_query: '',
             document_type_id: formData.document_type_id,
+            subject_id: null,
             content: formData.content
           });
 
@@ -281,10 +312,17 @@ export default function DocumentsPanel() {
                       {doc.name}
                       {isScraping === doc.id && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
                     </CardTitle>
-                    <p className="text-xs text-primary flex items-center gap-2">
-                      <span>Type: {doc.document_types?.name || 'Unknown'}</span>
-                      <AiBadge ai={doc.document_types?.ai} size="sm" />
-                    </p>
+                    <div className="text-xs flex flex-wrap gap-x-4 gap-y-1">
+                      <p className="text-primary flex items-center gap-2">
+                        <span>Type: {doc.document_types?.name || 'Unknown'}</span>
+                        <AiBadge ai={doc.document_types?.ai} size="sm" />
+                      </p>
+                      {doc.subjects && (
+                        <p className="text-muted-foreground">
+                          Subject: <span className="text-foreground font-medium">{doc.subjects.name}</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     {doc.document_types?.ai && (
@@ -319,10 +357,6 @@ export default function DocumentsPanel() {
                 </div>
               </CardHeader>
               <CardContent>
-                {doc.document_types?.ai && (
-                  <div className="text-xs text-muted-foreground mb-4">Query: {doc.search_query}</div>
-                )}
-                
                 <Collapsible>
                   <CollapsibleTrigger
                     render={
@@ -356,8 +390,8 @@ export default function DocumentsPanel() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[720px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6">
             <DialogTitle>{editingDocument ? 'Edit Document' : 'New Document'}</DialogTitle>
             <DialogDescription>
               {editingDocument
@@ -369,7 +403,7 @@ export default function DocumentsPanel() {
                   : 'Write the document content directly. This document type is manual — no AI research will be performed.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -403,13 +437,46 @@ export default function DocumentsPanel() {
             </div>
             {selectedTypeIsAi && (
               <div className="grid gap-2">
-                <Label htmlFor="query">Search Query</Label>
-                <Input
-                  id="query"
-                  placeholder="What should the AI research?"
-                  value={formData.search_query}
-                  onChange={(e) => setFormData({ ...formData, search_query: e.target.value })}
-                />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="subject">Subject</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-2 text-[10px] gap-1"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      fetchSubjects();
+                    }}
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+                <Select 
+                  value={formData.subject_id} 
+                  onValueChange={(value: string | null) => {
+                    if (value) setFormData({ ...formData, subject_id: value });
+                  }}
+                >
+                  <SelectTrigger id="subject">
+                    <SelectValue placeholder="Select a subject">
+                      {subjects.find(s => s.id === formData.subject_id)?.name}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.length === 0 ? (
+                      <div className="p-2 text-xs text-muted-foreground text-center">
+                        No subjects found. Create one in the Subjects tab first.
+                      </div>
+                    ) : (
+                      subjects.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {(editingDocument || !selectedTypeIsAi) && (
@@ -422,7 +489,7 @@ export default function DocumentsPanel() {
                     : 'Write the document content here.'}
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  className="min-h-[240px] max-h-[50vh] font-mono text-xs leading-relaxed"
+                  className="min-h-[240px] font-mono text-xs leading-relaxed"
                 />
                 {selectedTypeIsAi ? (
                   <p className="text-xs text-muted-foreground">
@@ -436,7 +503,7 @@ export default function DocumentsPanel() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t border-border">
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveDocument}>
               {editingDocument

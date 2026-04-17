@@ -14,16 +14,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the document and its associated document type instructions
+    // Fetch the document and its associated document type instructions and subject content
     const { data: document, error: docError } = await supabase
       .from('documents')
       .select(`
         id,
-        search_query,
         document_type_id,
+        subject_id,
         document_types (
           ai,
           transformation_instructions
+        ),
+        subjects (
+          name,
+          content
         )
       `)
       .eq('id', id)
@@ -37,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const documentType = document.document_types as unknown as { ai: boolean; transformation_instructions: string } | null;
-    const searchQuery = document.search_query;
+    const subject = document.subjects as unknown as { name: string; content: string } | null;
     const transformationInstructions = documentType?.transformation_instructions;
 
     if (documentType && documentType.ai === false) {
@@ -47,9 +51,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!searchQuery || !transformationInstructions) {
+    if (!subject || !transformationInstructions) {
       return NextResponse.json(
-        { error: 'Document is missing search query or transformation instructions' },
+        { error: 'Document is missing subject or transformation instructions' },
         { status: 400 }
       );
     }
@@ -59,14 +63,16 @@ export async function POST(request: NextRequest) {
 You are an expert researcher and knowledge synthesizer.
 
 Your task:
-1. Research the following query thoroughly using your available tools.
-2. Synthesize the information according to these specific transformation instructions:
+1. Review the following subject material thoroughly.
+2. Synthesize the information according to these specific transformation instructions.
+3. At the very end of the document, add a "## Resources" section listing the primary sources of information used including external knowledge applied but excluding the provided subject details.
 
 **Transformation Instructions:**
 ${transformationInstructions}
 
-**Query to Research:**
-${searchQuery}
+**Subject to Research:**
+Subject: ${subject.name}
+Details: ${subject.content}
 
 Provide a comprehensive, well-structured response that follows the transformation instructions exactly.
 Be accurate, insightful, and focus on creating high-quality knowledge.
@@ -77,7 +83,7 @@ Be accurate, insightful, and focus on creating high-quality knowledge.
       model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Please research and synthesize knowledge about: ${searchQuery}` }
+        { role: 'user', content: `Please research and synthesize knowledge about the subject: ${subject.name}. Use the provided details: ${subject.content}. Remember to list your resources at the end of the document.` }
       ],
       temperature: 0.3,
       max_tokens: 8000,
