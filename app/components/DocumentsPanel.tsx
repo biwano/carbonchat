@@ -5,15 +5,10 @@ import { useQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } fro
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Play, FileText, Trash2, Plus, Edit, Loader2, ChevronDown } from 'lucide-react';
+import { RefreshCw, Play, FileText, Trash2, Plus, Edit, Loader2, Info, AlertCircle } from 'lucide-react';
 import AiBadge from './AiBadge';
 import { supabase } from '@/lib/supabase';
 import { DocumentWithRelations as Document } from '@/lib/supabase.types';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -63,7 +58,10 @@ function DocumentSkeleton() {
 
 export default function DocumentsPanel() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
+  const [scrapeErrors, setScrapeErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: '',
     document_type_id: '',
@@ -112,6 +110,12 @@ export default function DocumentsPanel() {
 
   const scrapeMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Clear previous error for this document if any
+      setScrapeErrors(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       const res = await fetch('/api/documents/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,40 +128,23 @@ export default function DocumentsPanel() {
     onSuccess: () => {
       refetchDocs();
     },
-    onError: (error) => {
-      alert(`Failed to generate document: ${error.message}`);
+    onError: (error, id) => {
+      setScrapeErrors(prev => ({ ...prev, [id]: error.message }));
+      // We can keep the alert for critical errors, or just use the UI badge
+      // console.error(`Failed to generate document ${id}: ${error.message}`);
     }
   });
 
   const { mutate: insertDoc, isPending: isInsertingPending } = useInsertMutation(
     supabase.from('documents'),
     ['id'],
-    null,
-    {
-      onSuccess: (data: Document[] | null) => {
-        if (data && data[0] && selectedTypeIsAi) {
-          scrapeMutation.mutate(data[0].id);
-        }
-        setIsDialogOpen(false);
-      },
-      onError: (error) => {
-        alert(`Failed to create document: ${error.message}`);
-      }
-    }
+    '*, document_types(name, ai), subjects(name)'
   );
 
   const { mutate: updateDoc, isPending: isUpdatingPending } = useUpdateMutation(
     supabase.from('documents'),
     ['id'],
-    null,
-    {
-      onSuccess: () => {
-        setIsDialogOpen(false);
-      },
-      onError: (error) => {
-        alert(`Failed to update document: ${error.message}`);
-      }
-    }
+    '*, document_types(name, ai), subjects(name)'
   );
 
   const selectedType = (documentTypes || []).find(t => t.id === formData.document_type_id);
@@ -170,10 +157,12 @@ export default function DocumentsPanel() {
 
   const handleOpenCreateDialog = () => {
     setEditingDocument(null);
+    const defaultType = documentTypes?.[0]?.id || '';
+    const defaultSubject = subjects?.[0]?.id || '';
     setFormData({
       name: '',
-      document_type_id: documentTypes?.[0]?.id || '',
-      subject_id: subjects?.[0]?.id || '',
+      document_type_id: defaultType,
+      subject_id: defaultSubject,
       content: '',
       sources: ''
     });
@@ -190,6 +179,11 @@ export default function DocumentsPanel() {
       sources: doc.sources ?? ''
     });
     setIsDialogOpen(true);
+  };
+
+  const handleOpenDetailsDialog = (doc: Document) => {
+    setViewingDocument(doc);
+    setIsDetailsDialogOpen(true);
   };
 
   const handleSaveDocument = () => {
@@ -217,13 +211,30 @@ export default function DocumentsPanel() {
     };
 
     if (editingDocument) {
-      updateDoc({ ...payload, id: editingDocument.id });
+      updateDoc({ ...payload, id: editingDocument.id }, {
+        onSuccess: () => {
+          setIsDialogOpen(false);
+        },
+        onError: (error) => {
+          alert(`Failed to update document: ${error.message}`);
+        }
+      });
     } else {
       if (selectedTypeIsAi) {
         payload.content = 'Researching and generating knowledge...';
         payload.sources = '';
       }
-      insertDoc([payload]);
+      insertDoc([payload], {
+        onSuccess: (data) => {
+          if (data && data[0] && selectedTypeIsAi) {
+            scrapeMutation.mutate(data[0].id);
+          }
+          setIsDialogOpen(false);
+        },
+        onError: (error) => {
+          alert(`Failed to create document: ${error.message}`);
+        }
+      });
     }
   };
 
@@ -275,7 +286,17 @@ export default function DocumentsPanel() {
                   <div className="space-y-1">
                     <CardTitle className="text-lg flex items-center gap-2">
                       {doc.name}
-                      {isScraping(doc.id) && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                      {isScraping(doc.id) ? (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 animate-pulse">
+                          <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                          <span className="text-[10px] font-medium text-primary uppercase tracking-wider">Researching</span>
+                        </div>
+                      ) : scrapeErrors[doc.id] ? (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive">
+                          <AlertCircle className="w-3 h-3" />
+                          <span className="text-[10px] font-medium uppercase tracking-wider" title={scrapeErrors[doc.id]}>Research Failed</span>
+                        </div>
+                      ) : null}
                     </CardTitle>
                     <div className="text-xs flex flex-wrap gap-x-4 gap-y-1">
                       <p className="text-primary flex items-center gap-2">
@@ -293,18 +314,27 @@ export default function DocumentsPanel() {
                     {doc.document_types?.ai && (
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant={scrapeErrors[doc.id] ? "destructive" : "outline"}
                         disabled={scrapeMutation.isPending}
                         onClick={() => scrapeMutation.mutate(doc.id)}
                       >
                         {isScraping(doc.id) ? (
                           <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        ) : scrapeErrors[doc.id] ? (
+                          <RefreshCw className="w-3 h-3 mr-1" />
                         ) : (
                           <Play className="w-3 h-3 mr-1" />
                         )}
-                        Refresh Content
+                        {scrapeErrors[doc.id] ? "Retry Research" : "Refresh Content"}
                       </Button>
                     )}
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => handleOpenDetailsDialog(doc)}
+                    >
+                      <Info className="w-4 h-4" />
+                    </Button>
                     <Button 
                       size="sm" 
                       variant="ghost" 
@@ -330,39 +360,7 @@ export default function DocumentsPanel() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Collapsible>
-                  <CollapsibleTrigger
-                    render={
-                      <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
-                    }
-                  >
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Document Content</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-2">
-                    <div className="max-h-96 overflow-auto bg-muted p-4 rounded border border-border text-sm whitespace-pre-wrap font-light text-foreground leading-relaxed">
-                      {doc.content}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                <Collapsible className="mt-4">
-                  <CollapsibleTrigger
-                    render={
-                      <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
-                    }
-                  >
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Research Sources</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-2">
-                    <div className="max-h-48 overflow-auto bg-muted/50 p-4 rounded border border-border text-xs whitespace-pre-wrap font-light text-foreground leading-relaxed italic">
-                      {doc.sources || 'No sources documented for this research.'}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                <div className="flex justify-between items-center mt-4 pt-4 border-t border-border/50">
+                <div className="flex justify-between items-center">
                   <div className="text-[10px] text-muted-foreground">
                     Created: {new Date(doc.created_at).toLocaleString()}
                   </div>
@@ -379,7 +377,7 @@ export default function DocumentsPanel() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col p-0 overflow-hidden border border-border">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle>{editingDocument ? 'Edit Document' : 'New Document'}</DialogTitle>
             <DialogDescription>
@@ -530,6 +528,78 @@ export default function DocumentsPanel() {
                   : 'Create Document'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col p-0 overflow-hidden border border-border">
+          {viewingDocument && (
+            <>
+              <DialogHeader className="px-6 pt-6">
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-2xl">{viewingDocument.name}</DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <AiBadge ai={viewingDocument.document_types?.ai} />
+                  </div>
+                </div>
+                <DialogDescription>
+                  Full document information and research results
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="flex-1 overflow-y-auto">
+                <div className="px-6 py-6 space-y-6">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Type</Label>
+                      <p className="font-medium">{viewingDocument.document_types?.name}</p>
+                    </div>
+                    {viewingDocument.subjects && (
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Subject</Label>
+                        <p className="font-medium">{viewingDocument.subjects.name}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="h-px bg-border/50 w-full" />
+
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Document Content</Label>
+                    <div className="bg-muted p-5 rounded-lg border border-border text-sm whitespace-pre-wrap font-light text-foreground leading-relaxed">
+                      {viewingDocument.content || <span className="text-muted-foreground italic">No content available.</span>}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Research Sources</Label>
+                    <div className="bg-muted/50 p-5 rounded-lg border border-border text-xs whitespace-pre-wrap font-light text-foreground leading-relaxed italic">
+                      {viewingDocument.sources || 'No sources documented for this research.'}
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-border/50 w-full" />
+
+                  <div className="flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-tight">
+                    <div>Created: {new Date(viewingDocument.created_at).toLocaleString()}</div>
+                    {viewingDocument.updated_at && (
+                      <div>Updated: {new Date(viewingDocument.updated_at).toLocaleString()}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20">
+                <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)}>Close</Button>
+                <Button onClick={() => {
+                  setIsDetailsDialogOpen(false);
+                  handleOpenEditDialog(viewingDocument);
+                }}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Document
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

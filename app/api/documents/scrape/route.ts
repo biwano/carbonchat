@@ -63,17 +63,25 @@ export async function POST(request: NextRequest) {
 
     // Create a system prompt that instructs the AI to research and transform
     const systemPrompt = `
-    You are an expert researcher and knowledge synthesizer.
+    You are an expert researcher and knowledge synthesizer with advanced web-research capabilities.
     
-    Your task:
-    1. Review the following subject material thoroughly.
-    2. Review and research any provided additional sources (blogs, social media, etc.).
-    3. Favor recent documents and information over older ones when researching and synthesizing.
-    4. Synthesize the information according to these specific transformation instructions.
+    Your mission is to create high-quality, accurate, and up-to-date knowledge entries.
     
+    **Research Phase:**
+    1. Deeply analyze the provided Subject material.
+    2. Use your research capabilities to investigate the "Additional Sources" provided (these may be URLs, blogs, social media accounts, or specific domains).
+    3. Look for the most recent information, favoring latest developments and current data over historical or outdated facts.
+    4. Cross-reference information across multiple sources to ensure accuracy.
+    
+    **Synthesis Phase:**
+    1. Transform the gathered information according to the "Transformation Instructions" provided below.
+    2. Maintain the requested tone, structure, and depth.
+    3. Ensure the output is formatted as clean, professional Markdown.
+    
+    **Output Requirement:**
     Return your response as a JSON object with exactly these two keys:
     - "content": The synthesized knowledge (markdown format).
-    - "sources": A list of all sources and URLs used for the research, as a single string (markdown format).
+    - "sources": A comprehensive list of all sources, URLs, and references used for the research, as a single string (markdown format). Include both the provided additional sources if used, and any new sources discovered during research.
     
     **Transformation Instructions:**
     ${transformationInstructions}
@@ -81,9 +89,9 @@ export async function POST(request: NextRequest) {
     **Subject to Research:**
     Subject: ${subject.name}
     Details: ${subject.content}
-    ${additionalSources ? `\n**Additional Sources to Research:**\n${additionalSources}` : ''}
+    ${additionalSources ? `\n**Additional Sources to Research and Browse:**\n${additionalSources}` : ''}
     
-    Be accurate, insightful, and focus on creating high-quality knowledge.
+    Focus on creating a "definitive guide" style entry that is immediately useful for the knowledge base.
     `;
     
     // Call OpenRouter (via OpenAI SDK) - using cheapest good model
@@ -91,7 +99,7 @@ export async function POST(request: NextRequest) {
       model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Please research and synthesize knowledge about the subject: ${subject.name}. Use the provided details: ${subject.content}.${additionalSources ? ` Also research these additional sources: ${additionalSources}.` : ''}` }
+        { role: 'user', content: `Start Research Now: Please research and synthesize knowledge about "${subject.name}". ${additionalSources ? `Pay special attention to these sources: ${additionalSources}.` : ''} Follow the transformation instructions precisely.` }
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3,

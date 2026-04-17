@@ -7,4 +7,4 @@ ALTER TABLE document_types
   ADD COLUMN IF NOT EXISTS ai BOOLEAN NOT NULL DEFAULT TRUE;
 
 COMMENT ON COLUMN document_types.ai IS
-  'If true, documents of this type are AI-researched via /api/documents/scrape. If false, documents are manually authored by the user (content editable at creation, search_query unused).';
+  'If true, documents of this type are AI-researched via /api/documents/scrape. If false, documents are manually authored by the user (content editable at creation).';

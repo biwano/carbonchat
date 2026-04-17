@@ -144,8 +144,9 @@ export default function HelpPanel() {
           </p>
           <ol className="list-decimal pl-6 space-y-1">
             <li>You create a document by selecting a **Type** and a **Subject**.</li>
+            <li>Clicking <span className="text-foreground font-medium">&quot;Start Research&quot;</span> creates the document and triggers the AI agent.</li>
             <li>The AI researches the subject and synthesizes content per the type&apos;s rules.</li>
-            <li>The result is stored as content. You can edit it manually or Refresh it anytime to regenerate from the subject.</li>
+            <li>The result is stored as content. You can edit it manually or use <span className="text-foreground font-medium">&quot;Refresh Content&quot;</span> anytime to regenerate it.</li>
           </ol>
           <p className="text-foreground font-medium flex items-center gap-1 pt-1">
             <User className="w-4 h-4" />
