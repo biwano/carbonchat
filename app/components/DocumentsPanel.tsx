@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@supabase-cache-helpers/postgrest-react-query';
-import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Play, FileText, Trash2, Plus, Edit, Loader2, Info, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { RefreshCw, FileText, Plus, Edit, Loader2 } from 'lucide-react';
 import AiBadge from './AiBadge';
+import DocumentCard from './DocumentCard';
+import { useScrapeMutation } from '@/app/hooks/useScrapeMutation';
 import { supabase } from '@/lib/supabase';
 import { DocumentWithRelations as Document } from '@/lib/supabase.types';
 import {
@@ -61,7 +62,7 @@ export default function DocumentsPanel() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
-  const [scrapeErrors, setScrapeErrors] = useState<Record<string, string>>({});
+  const [refreshingAll, setRefreshingAll] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     document_type_id: '',
@@ -108,32 +109,25 @@ export default function DocumentsPanel() {
     null
   );
 
-  const scrapeMutation = useMutation({
-    mutationFn: async (id: string) => {
-      // Clear previous error for this document if any
-      setScrapeErrors(prev => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      const res = await fetch('/api/documents/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Scrape failed');
-      return result;
-    },
-    onSuccess: () => {
+  const scrapeMutation = useScrapeMutation();
+
+  const handleRefreshAll = async () => {
+    if (!documents) return;
+    const aiDocs = documents.filter(doc => doc.document_types?.ai);
+    if (aiDocs.length === 0) return;
+
+    setRefreshingAll(true);
+    try {
+      // Trigger individual mutations for each AI document
+      // This ensures each card shows its own loading state and error handling
+      await Promise.allSettled(aiDocs.map(doc => 
+        scrapeMutation.mutateAsync(doc.id)
+      ));
       refetchDocs();
-    },
-    onError: (error, id) => {
-      setScrapeErrors(prev => ({ ...prev, [id]: error.message }));
-      // We can keep the alert for critical errors, or just use the UI badge
-      // console.error(`Failed to generate document ${id}: ${error.message}`);
+    } finally {
+      setRefreshingAll(false);
     }
-  });
+  };
 
   const { mutate: insertDoc, isPending: isInsertingPending } = useInsertMutation(
     supabase.from('documents'),
@@ -227,7 +221,9 @@ export default function DocumentsPanel() {
       insertDoc([payload], {
         onSuccess: (data) => {
           if (data && data[0] && selectedTypeIsAi) {
-            scrapeMutation.mutate(data[0].id);
+            scrapeMutation.mutate(data[0].id, {
+              onSuccess: () => refetchDocs()
+            });
           }
           setIsDialogOpen(false);
         },
@@ -238,7 +234,6 @@ export default function DocumentsPanel() {
     }
   };
 
-  const isScraping = (id: string) => scrapeMutation.isPending && scrapeMutation.variables === id;
   const isPending = isInsertingPending || isUpdatingPending;
 
   return (
@@ -250,13 +245,13 @@ export default function DocumentsPanel() {
         </div>
         <div className="flex gap-2">
           <Button 
-            onClick={() => refetchDocs()} 
-            disabled={isLoadingDocs || isFetchingDocs} 
+            onClick={handleRefreshAll} 
+            disabled={isLoadingDocs || isFetchingDocs || refreshingAll || !documents || documents.length === 0} 
             variant="outline" 
             className="border-border hover:bg-muted"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetchingDocs ? 'animate-spin' : ''}`} />
-            Refresh List
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetchingDocs || refreshingAll ? 'animate-spin' : ''}`} />
+            Refresh All Content
           </Button>
           <Button onClick={handleOpenCreateDialog}>
             <Plus className="w-4 h-4 mr-2" />
@@ -280,98 +275,15 @@ export default function DocumentsPanel() {
           </Card>
         ) : (
           documents.map((doc) => (
-            <Card key={doc.id} className={`border border-border ${isScraping(doc.id) ? 'opacity-70' : ''}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      {doc.name}
-                      {isScraping(doc.id) ? (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 animate-pulse">
-                          <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                          <span className="text-[10px] font-medium text-primary uppercase tracking-wider">Researching</span>
-                        </div>
-                      ) : scrapeErrors[doc.id] ? (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-destructive/10 border border-destructive/20 text-destructive">
-                          <AlertCircle className="w-3 h-3" />
-                          <span className="text-[10px] font-medium uppercase tracking-wider" title={scrapeErrors[doc.id]}>Research Failed</span>
-                        </div>
-                      ) : null}
-                    </CardTitle>
-                    <div className="text-xs flex flex-wrap gap-x-4 gap-y-1">
-                      <p className="text-primary flex items-center gap-2">
-                        <span>Type: {doc.document_types?.name || 'Unknown'}</span>
-                        <AiBadge ai={doc.document_types?.ai} size="sm" />
-                      </p>
-                      {doc.subjects && (
-                        <p className="text-muted-foreground">
-                          Subject: <span className="text-foreground font-medium">{doc.subjects.name}</span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {doc.document_types?.ai && (
-                      <Button
-                        size="sm"
-                        variant={scrapeErrors[doc.id] ? "destructive" : "outline"}
-                        disabled={scrapeMutation.isPending}
-                        onClick={() => scrapeMutation.mutate(doc.id)}
-                      >
-                        {isScraping(doc.id) ? (
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                        ) : scrapeErrors[doc.id] ? (
-                          <RefreshCw className="w-3 h-3 mr-1" />
-                        ) : (
-                          <Play className="w-3 h-3 mr-1" />
-                        )}
-                        {scrapeErrors[doc.id] ? "Retry Research" : "Refresh Content"}
-                      </Button>
-                    )}
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => handleOpenDetailsDialog(doc)}
-                    >
-                      <Info className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      disabled={scrapeMutation.isPending}
-                      onClick={() => handleOpenEditDialog(doc)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="text-destructive"
-                      disabled={scrapeMutation.isPending || (isDeletingPending && deletingVariables?.id === doc.id)}
-                      onClick={() => handleDelete(doc.id)}
-                    >
-                      {isDeletingPending && deletingVariables?.id === doc.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <div className="text-[10px] text-muted-foreground">
-                    Created: {new Date(doc.created_at).toLocaleString()}
-                  </div>
-                  {doc.updated_at && (
-                    <div className="text-[10px] text-muted-foreground">
-                      Updated: {new Date(doc.updated_at).toLocaleString()}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <DocumentCard
+              key={doc.id}
+              doc={doc}
+              onEdit={handleOpenEditDialog}
+              onDelete={handleDelete}
+              onViewDetails={handleOpenDetailsDialog}
+              onRefreshSuccess={() => refetchDocs()}
+              isDeleting={isDeletingPending && deletingVariables?.id === doc.id}
+            />
           ))
         )}
       </div>
