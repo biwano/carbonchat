@@ -22,6 +22,7 @@ interface FormData {
   name: string;
   transformation_instructions: string;
   additional_sources: string;
+  source_relevance_factors: string;
   description: string;
   ai: boolean;
 }
@@ -30,6 +31,7 @@ const EMPTY_FORM: FormData = {
   name: '',
   transformation_instructions: '',
   additional_sources: '',
+  source_relevance_factors: '',
   description: '',
   ai: true,
 };
@@ -109,6 +111,7 @@ export default function DocumentTypesPanel() {
       ...formData,
       transformation_instructions: formData.ai ? formData.transformation_instructions : '',
       additional_sources: formData.ai ? formData.additional_sources : '',
+      source_relevance_factors: formData.ai ? formData.source_relevance_factors : '',
     };
 
     create([payload]);
@@ -122,6 +125,7 @@ export default function DocumentTypesPanel() {
       ...formData,
       transformation_instructions: formData.ai ? formData.transformation_instructions : '',
       additional_sources: formData.ai ? formData.additional_sources : '',
+      source_relevance_factors: formData.ai ? formData.source_relevance_factors : '',
     };
 
     update({ ...payload, id });
@@ -138,6 +142,7 @@ export default function DocumentTypesPanel() {
       name: type.name,
       transformation_instructions: type.transformation_instructions,
       additional_sources: type.additional_sources || '',
+      source_relevance_factors: type.source_relevance_factors || '',
       description: type.description || '',
       ai: type.ai
     });
@@ -225,6 +230,16 @@ export default function DocumentTypesPanel() {
                     onChange={(e) => setFormData({ ...formData, additional_sources: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">The AI will use these sources to supplement its research.</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Source Relevance Factors</label>
+                  <Textarea
+                    placeholder="Tell the AI how to prioritize and rate sources (e.g. 'Prefer academic papers', 'Ignore social media')..."
+                    rows={3}
+                    value={formData.source_relevance_factors}
+                    onChange={(e) => setFormData({ ...formData, source_relevance_factors: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">The AI will use these instructions to rate the pertinence of each source.</p>
                 </div>
               </>
             )}
@@ -331,6 +346,15 @@ export default function DocumentTypesPanel() {
                           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Additional Sources</span>
                           <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
                             {type.additional_sources}
+                          </div>
+                        </div>
+                      )}
+
+                      {type.source_relevance_factors && (
+                        <div className="space-y-2">
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Source Relevance Factors</span>
+                          <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
+                            {type.source_relevance_factors}
                           </div>
                         </div>
                       )}

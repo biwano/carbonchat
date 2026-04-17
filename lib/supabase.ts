@@ -14,6 +14,7 @@ export type Database = {
           name: string
           transformation_instructions: string
           additional_sources: string | null
+          source_relevance_factors: string
           description?: string
           ai: boolean
           created_at: string
@@ -23,6 +24,17 @@ export type Database = {
           name: string
           transformation_instructions: string
           additional_sources?: string | null
+          source_relevance_factors?: string
+          description?: string
+          ai?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          transformation_instructions?: string
+          additional_sources?: string | null
+          source_relevance_factors?: string
           description?: string
           ai?: boolean
           created_at?: string

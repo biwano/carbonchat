@@ -64,11 +64,14 @@ export default function HelpPanel() {
           <p>
             A Subject defines the{' '}
             <span className="text-foreground font-medium">core topic</span> or{' '}
-            <span className="text-foreground font-medium">source information</span>{' '}
-            that the AI should research.
+            <span className="text-foreground font-medium">research objective</span>{' '}
+            that the AI agent should explore.
           </p>
           <p>
             Each subject has a name and a detailed content description. This content is passed to the AI agent as the primary source of truth or research objective.
+          </p>
+          <p>
+            Think of the Subject content as the <span className="text-foreground font-medium">primary prompt</span> for the research phase. The more detailed and specific your description, the better the AI can focus its search.
           </p>
           <p>
             One subject can be reused by multiple documents. For example, you might have a subject &quot;Next.js 15&quot; and create several documents using different types (Summary, FAQ, Technical Guide) for that same subject.
@@ -99,9 +102,13 @@ export default function HelpPanel() {
             — a prompt describing the desired structure, tone, format, and constraints.
           </p>
           <p>
-            AI types can also include{' '}
+            AI types also include{' '}
             <span className="text-foreground font-medium">additional sources</span>{' '}
-            (blogs, social media accounts, etc.). The AI agent will research these specific sources to supplement the information provided in the Subject.
+            (blogs, social media accounts, etc.) and{' '}
+            <span className="text-foreground font-medium">source relevance factors</span>.
+          </p>
+          <p>
+            The AI agent will research the additional sources to supplement its general research and use the relevance factors to prioritize and rate the quality of each source it finds.
           </p>
           <p>
             A type also has an{' '}
@@ -136,7 +143,7 @@ export default function HelpPanel() {
         <CardContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
           <p>
             A Document is a single{' '}
-            <span className="text-foreground font-medium">knowledge entry</span>.
+            <span className="text-foreground font-medium">knowledge entry</span>. It holds the final content and any sources used to create it.
           </p>
           <p className="text-foreground font-medium flex items-center gap-1">
             <Sparkles className="w-4 h-4 text-primary" />
@@ -145,17 +152,59 @@ export default function HelpPanel() {
           <ol className="list-decimal pl-6 space-y-1">
             <li>You create a document by selecting a **Type** and a **Subject**.</li>
             <li>Clicking <span className="text-foreground font-medium">&quot;Start Research&quot;</span> creates the document and triggers the AI agent.</li>
-            <li>The AI researches the subject and synthesizes content per the type&apos;s rules.</li>
-            <li>The result is stored as content. You can edit it manually or use <span className="text-foreground font-medium">&quot;Refresh Content&quot;</span> anytime to regenerate it.</li>
+            <li>The AI researches the subject (and any additional sources from the Type) and synthesizes content per the type&apos;s instructions.</li>
+            <li>The result is stored as content, and any URLs found during research are saved in the <span className="text-foreground font-medium">Sources</span> field.</li>
+            <li>You can edit it manually or use <span className="text-foreground font-medium">&quot;Refresh Content&quot;</span> anytime to regenerate it.</li>
           </ol>
           <p className="text-foreground font-medium flex items-center gap-1 pt-1">
             <User className="w-4 h-4" />
             Manual documents
           </p>
           <ol className="list-decimal pl-6 space-y-1">
-            <li>You create a document by writing the content directly.</li>
+            <li>You create a document by writing the content and sources directly.</li>
             <li>No subject is used, and no AI research is performed.</li>
           </ol>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Lightbulb className="w-5 h-5 text-primary" />
+            Best Practices
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground leading-relaxed space-y-4">
+          <div className="space-y-2">
+            <p className="text-foreground font-medium">1. Transformation Instructions</p>
+            <p>
+              Be specific about the desired output format. Instead of &quot;Summarize this&quot;, try:
+              <br />
+              <span className="italic">&quot;Extract key features and code examples. Present them as a bulleted list with a final summary of potential use cases.&quot;</span>
+            </p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-foreground font-medium">2. Subject Content</p>
+            <p>
+              Provide clear and detailed descriptions for your subjects. This is what the AI uses to search the web.
+              <br />
+              <span className="italic">Good Subject Content: &quot;Research the latest features of Next.js 15, specifically focusing on the new caching mechanisms and PPR (Partial Prerendering).&quot;</span>
+            </p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-foreground font-medium">3. Additional Sources</p>
+            <p>
+              Use the <span className="text-foreground font-medium">Additional Sources</span> field in Document Types to point the AI to specific trustworthy URLs, blogs, or social media handles to supplement its general research.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <p className="text-foreground font-medium">4. Source Relevance Factors</p>
+            <p>
+              Guide the AI on how to value different sources. For example:
+              <br />
+              <span className="italic">&quot;Prioritize official documentation and GitHub repositories. Treat forum posts as low-relevance and ignore marketing landing pages.&quot;</span>
+            </p>
+          </div>
         </CardContent>
       </Card>
 

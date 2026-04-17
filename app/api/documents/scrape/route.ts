@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
         document_types (
           ai,
           transformation_instructions,
-          additional_sources
+          additional_sources,
+          source_relevance_factors
         ),
         subjects (
           name,
@@ -36,16 +37,18 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (docError || !document) {
+      console.error('Document not found:', docError);
       return NextResponse.json(
         { error: 'Document not found. Scrape can only be performed on existing documents.' },
         { status: 404 }
       );
     }
 
-    const documentType = document.document_types as unknown as Pick<DocumentType, 'ai' | 'transformation_instructions' | 'additional_sources'> | null;
+    const documentType = document.document_types as unknown as Pick<DocumentType, 'ai' | 'transformation_instructions' | 'additional_sources' | 'source_relevance_factors'> | null;
     const subject = document.subjects as unknown as Pick<Subject, 'name' | 'content'> | null;
     const transformationInstructions = documentType?.transformation_instructions;
     const additionalSources = documentType?.additional_sources;
+    const sourceRelevanceFactors = documentType?.source_relevance_factors;
 
     if (documentType && documentType.ai === false) {
       return NextResponse.json(
@@ -71,7 +74,8 @@ export async function POST(request: NextRequest) {
     1. Deeply analyze the provided Subject material.
     2. Use your research capabilities to investigate the "Additional Sources" provided (these may be URLs, blogs, social media accounts, or specific domains).
     3. Look for the most recent information, favoring latest developments and current data over historical or outdated facts.
-    4. Cross-reference information across multiple sources to ensure accuracy.
+    4. Rate and prioritize each source based on the "Source Relevance Factors" provided below.
+    5. Cross-reference information across multiple sources to ensure accuracy.
     
     **Synthesis Phase:**
     1. Transform the gathered information according to the "Transformation Instructions" provided below.
@@ -81,10 +85,14 @@ export async function POST(request: NextRequest) {
     **Output Requirement:**
     Return your response as a JSON object with exactly these two keys:
     - "content": The synthesized knowledge (markdown format).
-    - "sources": A comprehensive list of all sources, URLs, and references used for the research, as a single string (markdown format). Include both the provided additional sources if used, and any new sources discovered during research.
+    - "sources": A comprehensive list of all sources, URLs, and references used for the research, as a single string (markdown format). 
+      - **CRITICAL**: For EVERY source, you MUST add a brief note reflecting its relevance, quality, and age based on the "Source Relevance Factors". Format each source clearly (e.g., "* [Source Name](URL) — **Relevance**: High (Official documentation from 2024)").
     
     **Transformation Instructions:**
     ${transformationInstructions}
+
+    **Source Relevance Factors:**
+    ${sourceRelevanceFactors || 'Rate sources based on their authority, freshness, and direct relevance to the subject.'}
     
     **Subject to Research:**
     Subject: ${subject.name}
@@ -99,7 +107,7 @@ export async function POST(request: NextRequest) {
       model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Start Research Now: Please research and synthesize knowledge about "${subject.name}". ${additionalSources ? `Pay special attention to these sources: ${additionalSources}.` : ''} Follow the transformation instructions precisely.` }
+        { role: 'user', content: `Execute research and synthesis for the subject: ${subject.name}. Refer to the system instructions for specific details, sources, and relevance factors.` }
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3,
