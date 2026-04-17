@@ -46,6 +46,7 @@ interface Document {
   name: string;
   search_query: string;
   content: string;
+  sources: string;
   created_at: string;
   updated_at?: string;
   document_type_id: string;
@@ -74,7 +75,8 @@ export default function DocumentsPanel() {
     search_query: '', // DEPRECATED
     document_type_id: '',
     subject_id: '',
-    content: ''
+    content: '',
+    sources: ''
   });
 
   const fetchDocuments = async () => {
@@ -151,7 +153,8 @@ export default function DocumentsPanel() {
       search_query: '',
       document_type_id: documentTypes[0]?.id || '',
       subject_id: subjects[0]?.id || '',
-      content: ''
+      content: '',
+      sources: ''
     });
     setIsDialogOpen(true);
   };
@@ -163,7 +166,8 @@ export default function DocumentsPanel() {
       search_query: doc.search_query || '',
       document_type_id: doc.document_type_id,
       subject_id: doc.subject_id || '',
-      content: doc.content ?? ''
+      content: doc.content ?? '',
+      sources: doc.sources ?? ''
     });
     setIsDialogOpen(true);
   };
@@ -193,6 +197,7 @@ export default function DocumentsPanel() {
           document_type_id: formData.document_type_id,
           subject_id: selectedTypeIsAi ? formData.subject_id : null,
           content: formData.content,
+          sources: formData.sources,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingDocument.id);
@@ -215,7 +220,8 @@ export default function DocumentsPanel() {
             search_query: '', // CLEAR SEARCH QUERY
             document_type_id: formData.document_type_id,
             subject_id: formData.subject_id,
-            content: 'Researching and generating knowledge...'
+            content: 'Researching and generating knowledge...',
+            sources: ''
           })
           .select()
           .single();
@@ -237,7 +243,8 @@ export default function DocumentsPanel() {
             search_query: '',
             document_type_id: formData.document_type_id,
             subject_id: null,
-            content: formData.content
+            content: formData.content,
+            sources: formData.sources
           });
 
         if (insertError) {
@@ -373,6 +380,22 @@ export default function DocumentsPanel() {
                   </CollapsibleContent>
                 </Collapsible>
 
+                <Collapsible className="mt-4">
+                  <CollapsibleTrigger
+                    render={
+                      <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
+                    }
+                  >
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Research Sources</span>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2">
+                    <div className="max-h-48 overflow-auto bg-muted/50 p-4 rounded border border-border text-xs whitespace-pre-wrap font-light text-foreground leading-relaxed italic">
+                      {doc.sources || 'No sources documented for this research.'}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
                 <div className="flex justify-between items-center mt-4 pt-4 border-t border-border/50">
                   <div className="text-[10px] text-muted-foreground">
                     Created: {new Date(doc.created_at).toLocaleString()}
@@ -500,6 +523,25 @@ export default function DocumentsPanel() {
                     This document type is manual. Content is written and edited directly — no AI research is performed.
                   </p>
                 )}
+              </div>
+            )}
+            {(editingDocument || !selectedTypeIsAi) && (
+              <div className="grid gap-2">
+                <Label htmlFor="sources">Sources</Label>
+                <Textarea
+                  id="sources"
+                  placeholder={selectedTypeIsAi
+                    ? 'Sources used for research. Edit manually or regenerate via Refresh Content.'
+                    : 'List any sources or URLs here.'}
+                  value={formData.sources}
+                  onChange={(e) => setFormData({ ...formData, sources: e.target.value })}
+                  className="min-h-[120px] font-mono text-xs leading-relaxed"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {selectedTypeIsAi 
+                    ? 'URLs and resources used by the AI agent.' 
+                    : 'Reference sources for this manual document.'}
+                </p>
               </div>
             )}
           </div>

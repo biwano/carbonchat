@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
         subject_id,
         document_types (
           ai,
-          transformation_instructions
+          transformation_instructions,
+          additional_sources
         ),
         subjects (
           name,
@@ -40,9 +41,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const documentType = document.document_types as unknown as { ai: boolean; transformation_instructions: string } | null;
+    const documentType = document.document_types as unknown as { ai: boolean; transformation_instructions: string; additional_sources: string } | null;
     const subject = document.subjects as unknown as { name: string; content: string } | null;
     const transformationInstructions = documentType?.transformation_instructions;
+    const additionalSources = documentType?.additional_sources;
 
     if (documentType && documentType.ai === false) {
       return NextResponse.json(
@@ -60,43 +62,62 @@ export async function POST(request: NextRequest) {
 
     // Create a system prompt that instructs the AI to research and transform
     const systemPrompt = `
-You are an expert researcher and knowledge synthesizer.
-
-Your task:
-1. Review the following subject material thoroughly.
-2. Synthesize the information according to these specific transformation instructions.
-3. At the very end of the document, add a "## Resources" section listing the primary sources of information used including external knowledge applied but excluding the provided subject details.
-
-**Transformation Instructions:**
-${transformationInstructions}
-
-**Subject to Research:**
-Subject: ${subject.name}
-Details: ${subject.content}
-
-Provide a comprehensive, well-structured response that follows the transformation instructions exactly.
-Be accurate, insightful, and focus on creating high-quality knowledge.
-`;
-
+    You are an expert researcher and knowledge synthesizer.
+    
+    Your task:
+    1. Review the following subject material thoroughly.
+    2. Review and research any provided additional sources (blogs, social media, etc.).
+    3. Favor recent documents and information over older ones when researching and synthesizing.
+    4. Synthesize the information according to these specific transformation instructions.
+    
+    Return your response as a JSON object with exactly these two keys:
+    - "content": The synthesized knowledge (markdown format).
+    - "sources": A list of all sources and URLs used for the research, as a single string (markdown format).
+    
+    **Transformation Instructions:**
+    ${transformationInstructions}
+    
+    **Subject to Research:**
+    Subject: ${subject.name}
+    Details: ${subject.content}
+    ${additionalSources ? `\n**Additional Sources to Research:**\n${additionalSources}` : ''}
+    
+    Be accurate, insightful, and focus on creating high-quality knowledge.
+    `;
+    
     // Call OpenRouter (via OpenAI SDK) - using cheapest good model
     const completion = await openai.chat.completions.create({
       model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Please research and synthesize knowledge about the subject: ${subject.name}. Use the provided details: ${subject.content}. Remember to list your resources at the end of the document.` }
+        { role: 'user', content: `Please research and synthesize knowledge about the subject: ${subject.name}. Use the provided details: ${subject.content}.${additionalSources ? ` Also research these additional sources: ${additionalSources}.` : ''}` }
       ],
+      response_format: { type: 'json_object' },
       temperature: 0.3,
       max_tokens: 8000,
     });
 
-    const generatedContent = completion.choices[0]?.message?.content || 
-      'Failed to generate content.';
+    const responseText = completion.choices[0]?.message?.content || '';
+    let generatedContent = 'Failed to generate content.';
+    let generatedSources = '';
 
-    // Update the existing document's content, updated_at, and metadata
+    if (responseText) {
+      try {
+        const parsedResponse = JSON.parse(responseText);
+        generatedContent = parsedResponse.content || responseText;
+        generatedSources = parsedResponse.sources || '';
+      } catch (e) {
+        console.warn('Failed to parse AI response as JSON, falling back to raw text:', e);
+        generatedContent = responseText;
+      }
+    }
+
+    // Update the existing document's content, sources, updated_at, and metadata
     const { data: updatedDocument, error: updateError } = await supabase
       .from('documents')
       .update({
         content: generatedContent,
+        sources: generatedSources,
         updated_at: new Date().toISOString(),
         metadata: {
           model: completion.model,

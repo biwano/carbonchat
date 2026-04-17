@@ -19,6 +19,7 @@ interface DocumentType {
   id: string;
   name: string;
   transformation_instructions: string;
+  additional_sources: string;
   description?: string;
   ai: boolean;
 }
@@ -26,6 +27,7 @@ interface DocumentType {
 interface FormData {
   name: string;
   transformation_instructions: string;
+  additional_sources: string;
   description: string;
   ai: boolean;
 }
@@ -33,6 +35,7 @@ interface FormData {
 const EMPTY_FORM: FormData = {
   name: '',
   transformation_instructions: '',
+  additional_sources: '',
   description: '',
   ai: true,
 };
@@ -64,6 +67,7 @@ export default function DocumentTypesPanel() {
     const payload = {
       ...formData,
       transformation_instructions: formData.ai ? formData.transformation_instructions : '',
+      additional_sources: formData.ai ? formData.additional_sources : '',
     };
 
     const { error } = await supabase
@@ -86,6 +90,7 @@ export default function DocumentTypesPanel() {
     const payload = {
       ...formData,
       transformation_instructions: formData.ai ? formData.transformation_instructions : '',
+      additional_sources: formData.ai ? formData.additional_sources : '',
     };
 
     const { error } = await supabase
@@ -122,6 +127,7 @@ export default function DocumentTypesPanel() {
     setFormData({
       name: type.name,
       transformation_instructions: type.transformation_instructions,
+      additional_sources: type.additional_sources || '',
       description: type.description || '',
       ai: type.ai
     });
@@ -190,15 +196,27 @@ export default function DocumentTypesPanel() {
               />
             </div>
             {formData.ai && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Transformation Instructions</label>
-                <Textarea
-                  placeholder="Tell the AI exactly how to process the research..."
-                  rows={6}
-                  value={formData.transformation_instructions}
-                  onChange={(e) => setFormData({ ...formData, transformation_instructions: e.target.value })}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Transformation Instructions</label>
+                  <Textarea
+                    placeholder="Tell the AI exactly how to process the research..."
+                    rows={6}
+                    value={formData.transformation_instructions}
+                    onChange={(e) => setFormData({ ...formData, transformation_instructions: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Additional Sources</label>
+                  <Textarea
+                    placeholder="Enter URLs or names of blogs, social media accounts, etc. for the AI to research..."
+                    rows={3}
+                    value={formData.additional_sources}
+                    onChange={(e) => setFormData({ ...formData, additional_sources: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">The AI will use these sources to supplement its research.</p>
+                </div>
+              </>
             )}
             <div className="flex gap-3 pt-2">
               {editingId ? (
@@ -254,21 +272,32 @@ export default function DocumentTypesPanel() {
                 {type.description && <p className="text-sm text-muted-foreground mb-3">{type.description}</p>}
 
                 {type.ai && (
-                  <Collapsible>
-                    <CollapsibleTrigger
-                      render={
-                        <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
-                      }
-                    >
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transformation Instructions</span>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-2">
-                      <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">
-                        {type.transformation_instructions}
+                  <div className="space-y-4">
+                    <Collapsible>
+                      <CollapsibleTrigger
+                        render={
+                          <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
+                        }
+                      >
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transformation Instructions</span>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pt-2">
+                        <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">
+                          {type.transformation_instructions}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    {type.additional_sources && (
+                      <div className="space-y-2">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Additional Sources</span>
+                        <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
+                          {type.additional_sources}
+                        </div>
                       </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>

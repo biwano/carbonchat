@@ -99,6 +99,11 @@ export default function HelpPanel() {
             — a prompt describing the desired structure, tone, format, and constraints.
           </p>
           <p>
+            AI types can also include{' '}
+            <span className="text-foreground font-medium">additional sources</span>{' '}
+            (blogs, social media accounts, etc.). The AI agent will research these specific sources to supplement the information provided in the Subject.
+          </p>
+          <p>
             A type also has an{' '}
             <span className="text-foreground font-medium">AI toggle</span>:
           </p>
