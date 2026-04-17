@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
   Collapsible,
