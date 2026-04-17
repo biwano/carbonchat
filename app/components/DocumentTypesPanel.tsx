@@ -205,11 +205,13 @@ export default function DocumentTypesPanel() {
                 {type.description && <p className="text-sm text-muted-foreground mb-3">{type.description}</p>}
                 
                 <Collapsible>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transformation Instructions</span>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                    </Button>
+                  <CollapsibleTrigger
+                    render={
+                      <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
+                    }
+                  >
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transformation Instructions</span>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-2">
                     <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">

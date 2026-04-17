@@ -281,11 +281,13 @@ export default function DocumentsPanel() {
                 <div className="text-xs text-muted-foreground mb-4">Query: {doc.search_query}</div>
                 
                 <Collapsible>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Document Content</span>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                    </Button>
+                  <CollapsibleTrigger
+                    render={
+                      <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
+                    }
+                  >
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Document Content</span>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-2">
                     <div className="max-h-96 overflow-auto bg-muted p-4 rounded border border-border text-sm whitespace-pre-wrap font-light text-foreground leading-relaxed">

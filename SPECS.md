@@ -19,7 +19,7 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
   - **Documents Management**: CRUD + one-click "Research Now" buttons that trigger AI-powered scraping. Update document's name, search query, or manual content editing. Refresh existing documents via the research endpoint.
   - **Help**: Static documentation tab that explains the mental model of `document_types` vs `documents`, recommended workflow (define a type → create a document → research → chat), how content flows into the chat as system prompt, and best-practice tips for writing transformation instructions and search queries.
 - **Document Scraper**: `POST /api/documents/scrape` endpoint using OpenRouter to research `search_query` and synthesize per `document_type` rules. Supports both initial creation and updating (refreshing) existing documents.
-- **Real-time Chat Interface**: Modern streaming responses grounded in the full knowledge base.
+- **Real-time Chat Interface**: Modern streaming responses grounded in the full knowledge base. When a user submits a message, the AI response is **streamed token-by-token from the server to the client over HTTP streaming** and rendered progressively in the chat bubble as it is generated (no waiting for the full response before the first character appears). The UI must clearly indicate an in-progress / streaming state. While a response is streaming, the user can **cancel/stop** generation; any tokens already received are kept as the (partial) assistant message. If the stream errors mid-way, the partial content so far is preserved and an inline **error message in red** is appended to that same assistant bubble.
 - **Unrestricted Public Access**: Row Level Security (RLS) is configured to allow **unauthenticated (anon) CRUD access** to both `document_types` and `documents` tables (useful for development/testing).
 
 ## Technical Stack
@@ -43,7 +43,7 @@ When a user interacts with the chatbot, **all documents are retrieved** and inje
 3. **Chat Engine**: On every user message, the system:
    - Loads all documents (with joined type instructions)
    - Builds a rich system prompt containing all document content + transformation rules
-   - Returns streamed or JSON response from OpenRouter
+   - Streams the OpenRouter completion back to the client in real time, so the client can render the response incrementally as tokens arrive.
 4. **UI Structure**: 
    - Full-page **Chat** interface at `/` (no tab selector).
    - Dedicated full-page **Administration** route at `/admin` (replaces previous Settings/Administration tab selector and separate panels; "Back to Chat" button removed from admin header for cleaner full-page experience).
