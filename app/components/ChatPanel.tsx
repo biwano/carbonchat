@@ -4,6 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Bot, Square } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -196,8 +200,65 @@ export default function ChatPanel() {
                     )}
                   </div>
                 )}
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {message.content}
+                <div className="text-sm leading-relaxed max-w-none">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]} 
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      h1: ({ children }) => <h1 className="text-2xl font-bold mt-6 mb-4 text-primary">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-xl font-semibold mt-5 mb-3 text-primary">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-lg font-medium mt-4 mb-2 text-primary">{children}</h3>,
+                      p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal pl-6 mb-4 space-y-1">{children}</ol>,
+                      li: ({ children }) => <li className="leading-normal [&>p]:mb-0">{children}</li>,
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-primary/30 pl-4 italic my-4 text-muted-foreground bg-muted/20 py-1 pr-2 rounded-r-sm">
+                          {children}
+                        </blockquote>
+                      ),
+                      code: ({ className, children, ...props }) => {
+                        const isInline = !className?.includes('hljs');
+                        return isInline ? (
+                          <code className="bg-muted px-1.5 py-0.5 rounded text-[0.85rem] font-mono font-medium text-primary border border-border/50" {...props}>
+                            {children}
+                          </code>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                      pre: ({ children }) => (
+                        <pre className="p-4 rounded-xl bg-muted/30 border border-border overflow-x-auto my-4">
+                          {children}
+                        </pre>
+                      ),
+                      a: ({ href, children }) => (
+                        <a 
+                          href={href} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary font-medium underline underline-offset-4 hover:text-primary/80"
+                        >
+                          {children}
+                        </a>
+                      ),
+                      table: ({ children }) => (
+                        <div className="my-6 w-full overflow-y-auto rounded-lg border border-border">
+                          <table className="w-full text-left text-sm">
+                            {children}
+                          </table>
+                        </div>
+                      ),
+                      thead: ({ children }) => <thead className="bg-muted font-bold">{children}</thead>,
+                      th: ({ children }) => <th className="px-4 py-2 border-b border-border">{children}</th>,
+                      td: ({ children }) => <td className="px-4 py-2 border-b border-border last:border-0">{children}</td>,
+                      tr: ({ children }) => <tr className="hover:bg-muted/30 transition-colors">{children}</tr>,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
                   {isLastAssistant && isStreaming && message.content.length > 0 && (
                     <span className="inline-block w-2 h-4 ml-0.5 align-[-2px] bg-foreground/70 animate-pulse" />
                   )}
