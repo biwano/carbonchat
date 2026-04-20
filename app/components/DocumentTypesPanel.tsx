@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit, Save, X, ChevronDown, Sparkles, User, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, ChevronDown, Sparkles, User, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DocumentType } from '@/lib/supabase.types';
 import {
@@ -15,6 +15,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import AiBadge from "./AiBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -25,6 +32,8 @@ interface FormData {
   source_relevance_factors: string;
   description: string;
   ai: boolean;
+  date_limit_start_days_ago: string;
+  date_limit_end_days_ago: string;
 }
 
 const EMPTY_FORM: FormData = {
@@ -34,6 +43,8 @@ const EMPTY_FORM: FormData = {
   source_relevance_factors: '',
   description: '',
   ai: true,
+  date_limit_start_days_ago: '',
+  date_limit_end_days_ago: '0',
 };
 
 function DocumentTypeSkeleton() {
@@ -60,7 +71,7 @@ function DocumentTypeSkeleton() {
 }
 
 export default function DocumentTypesPanel() {
-  const [isCreating, setIsCreating] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
 
@@ -69,7 +80,7 @@ export default function DocumentTypesPanel() {
     supabase
       .from('document_types')
       .select('*')
-      .order('name')
+      .order('updated_at', { ascending: false })
   );
 
   // Mutations using Supabase Cache Helpers
@@ -80,7 +91,7 @@ export default function DocumentTypesPanel() {
     {
       onSuccess: () => {
         setFormData(EMPTY_FORM);
-        setIsCreating(false);
+        setIsDialogOpen(false);
       },
     }
   );
@@ -93,6 +104,7 @@ export default function DocumentTypesPanel() {
       onSuccess: () => {
         setEditingId(null);
         setFormData(EMPTY_FORM);
+        setIsDialogOpen(false);
       },
     }
   );
@@ -112,6 +124,8 @@ export default function DocumentTypesPanel() {
       transformation_instructions: formData.ai ? formData.transformation_instructions : '',
       additional_sources: formData.ai ? formData.additional_sources : '',
       source_relevance_factors: formData.ai ? formData.source_relevance_factors : '',
+      date_limit_start_days_ago: (formData.ai && formData.date_limit_start_days_ago) ? parseInt(formData.date_limit_start_days_ago) : null,
+      date_limit_end_days_ago: formData.ai ? parseInt(formData.date_limit_end_days_ago || '0') : null,
     };
 
     create([payload]);
@@ -126,6 +140,8 @@ export default function DocumentTypesPanel() {
       transformation_instructions: formData.ai ? formData.transformation_instructions : '',
       additional_sources: formData.ai ? formData.additional_sources : '',
       source_relevance_factors: formData.ai ? formData.source_relevance_factors : '',
+      date_limit_start_days_ago: (formData.ai && formData.date_limit_start_days_ago) ? parseInt(formData.date_limit_start_days_ago) : null,
+      date_limit_end_days_ago: formData.ai ? parseInt(formData.date_limit_end_days_ago || '0') : null,
     };
 
     update({ ...payload, id });
@@ -144,16 +160,20 @@ export default function DocumentTypesPanel() {
       additional_sources: type.additional_sources || '',
       source_relevance_factors: type.source_relevance_factors || '',
       description: type.description || '',
-      ai: type.ai
+      ai: type.ai,
+      date_limit_start_days_ago: type.date_limit_start_days_ago?.toString() || '',
+      date_limit_end_days_ago: type.date_limit_end_days_ago?.toString() || '0'
     });
-    setIsCreating(false);
+    setIsDialogOpen(true);
   };
 
   const cancelAction = () => {
-    setIsCreating(false);
+    setIsDialogOpen(false);
     setEditingId(null);
     setFormData(EMPTY_FORM);
   };
+
+  const isPending = isCreatingPending || isUpdatingPending;
 
   return (
     <div className="space-y-6">
@@ -162,26 +182,29 @@ export default function DocumentTypesPanel() {
           <h2 className="text-3xl font-bold text-foreground">Document Types</h2>
           <p className="text-muted-foreground">Define how AI should transform research into knowledge</p>
         </div>
-        {!isCreating && !editingId && (
-          <Button onClick={() => setIsCreating(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Type
-          </Button>
-        )}
+        <Button onClick={() => {
+          setEditingId(null);
+          setFormData(EMPTY_FORM);
+          setIsDialogOpen(true);
+        }}>
+          <Plus className="w-4 h-4 mr-2" />
+          New Type
+        </Button>
       </div>
 
-      {(isCreating || editingId) && (
-        <Card className="border-primary/50">
-          <CardHeader>
-            <CardTitle>{editingId ? 'Edit Document Type' : 'Create New Document Type'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col p-0 overflow-hidden border border-border">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>{editingId ? 'Edit Document Type' : 'Create New Document Type'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
               <Input
                 placeholder="e.g. Technical Documentation"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                disabled={isPending}
               />
             </div>
             <div className="space-y-2">
@@ -190,6 +213,7 @@ export default function DocumentTypesPanel() {
                 placeholder="Short description of what this type is for"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                disabled={isPending}
               />
             </div>
             <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
@@ -208,10 +232,11 @@ export default function DocumentTypesPanel() {
                 id="ai-toggle"
                 checked={formData.ai}
                 onCheckedChange={(checked: boolean) => setFormData({ ...formData, ai: checked })}
+                disabled={isPending}
               />
             </div>
             {formData.ai && (
-              <>
+              <div className="space-y-4 pt-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Transformation Instructions</label>
                   <Textarea
@@ -219,6 +244,7 @@ export default function DocumentTypesPanel() {
                     rows={6}
                     value={formData.transformation_instructions}
                     onChange={(e) => setFormData({ ...formData, transformation_instructions: e.target.value })}
+                    disabled={isPending}
                   />
                 </div>
                 <div className="space-y-2">
@@ -228,6 +254,7 @@ export default function DocumentTypesPanel() {
                     rows={3}
                     value={formData.additional_sources}
                     onChange={(e) => setFormData({ ...formData, additional_sources: e.target.value })}
+                    disabled={isPending}
                   />
                   <p className="text-xs text-muted-foreground">The AI will use these sources to supplement its research.</p>
                 </div>
@@ -238,45 +265,77 @@ export default function DocumentTypesPanel() {
                     rows={3}
                     value={formData.source_relevance_factors}
                     onChange={(e) => setFormData({ ...formData, source_relevance_factors: e.target.value })}
+                    disabled={isPending}
                   />
                   <p className="text-xs text-muted-foreground">The AI will use these instructions to rate the pertinence of each source.</p>
                 </div>
-              </>
+                <div className="grid grid-cols-2 gap-4 border border-border p-3 rounded-lg bg-muted/20">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      Research Start (Days Ago)
+                    </label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      placeholder="e.g. 365 (Optional)"
+                      value={formData.date_limit_start_days_ago}
+                      onChange={(e) => setFormData({ ...formData, date_limit_start_days_ago: e.target.value })}
+                      disabled={isPending}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Empty = no start limit. 365 = 1 year ago.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      Research End (Days Ago)
+                    </label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      placeholder="e.g. 0"
+                      value={formData.date_limit_end_days_ago}
+                      onChange={(e) => setFormData({ ...formData, date_limit_end_days_ago: e.target.value })}
+                      disabled={isPending}
+                    />
+                    <p className="text-[10px] text-muted-foreground">0 = Now. 180 = ~6 months ago.</p>
+                  </div>
+                </div>
+              </div>
             )}
-            <div className="flex gap-3 pt-2">
-              {editingId ? (
-                <Button 
-                  onClick={() => handleUpdate(editingId)}
-                  disabled={isUpdatingPending}
-                >
-                  {isUpdatingPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4 mr-2" />
-                  )}
-                  Save Changes
-                </Button>
-              ) : (
-                <Button 
-                  onClick={handleCreate}
-                  disabled={isCreatingPending}
-                >
-                  {isCreatingPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4 mr-2" />
-                  )}
-                  Create Type
-                </Button>
-              )}
-              <Button variant="outline" onClick={cancelAction} disabled={isCreatingPending || isUpdatingPending}>
-                <X className="w-4 h-4 mr-2" />
-                Cancel
+          </div>
+          <DialogFooter className="px-6 py-4 border-t border-border">
+            <Button variant="outline" onClick={cancelAction} disabled={isPending}>
+              Cancel
+            </Button>
+            {editingId ? (
+              <Button 
+                onClick={() => handleUpdate(editingId)}
+                disabled={isPending}
+              >
+                {isUpdatingPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save Changes
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            ) : (
+              <Button 
+                onClick={handleCreate}
+                disabled={isPending}
+              >
+                {isCreatingPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                Create Type
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4">
         {isLoading ? (
@@ -324,42 +383,63 @@ export default function DocumentTypesPanel() {
                   {type.description && <p className="text-sm text-muted-foreground mb-3">{type.description}</p>}
 
                   {type.ai && (
-                    <div className="space-y-4">
                     <Collapsible>
                       <CollapsibleTrigger
                         render={
                           <Button variant="ghost" size="sm" className="w-full flex justify-between items-center p-2 h-auto hover:bg-muted/50" />
                         }
                       >
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transformation Instructions</span>
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Details</span>
                         <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-2">
+                      <CollapsibleContent className="pt-2 space-y-4">
+                        <div className="space-y-2 px-1">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-2">Transformation Instructions</span>
                           <div className="bg-muted p-6 rounded-lg border border-border text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-60 overflow-auto">
                             {type.transformation_instructions}
                           </div>
-                        </CollapsibleContent>
-                      </Collapsible>
+                        </div>
 
-                      {type.additional_sources && (
-                        <div className="space-y-2">
-                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Additional Sources</span>
-                          <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
-                            {type.additional_sources}
+                        {type.additional_sources && (
+                          <div className="space-y-2 px-1">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-2">Additional Sources</span>
+                            <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
+                              {type.additional_sources}
+                            </div>
+                          </div>
+                        )}
+
+                        {type.source_relevance_factors && (
+                          <div className="space-y-2 px-1">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-2">Source Relevance Factors</span>
+                            <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
+                              {type.source_relevance_factors}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="px-1">
+                          <div className="bg-muted/30 px-3 py-2 rounded-md border border-border/50 w-fit">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase block mb-1">Date Limit</span>
+                            <span className="text-xs text-foreground">
+                              {type.date_limit_start_days_ago !== null && type.date_limit_start_days_ago !== undefined ? (
+                                <>
+                                  <strong>{type.date_limit_start_days_ago}d</strong> ago to <strong>{type.date_limit_end_days_ago || 0}d</strong> ago
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground italic">No strict limit (prioritize recent)</span>
+                              )}
+                            </span>
                           </div>
                         </div>
-                      )}
-
-                      {type.source_relevance_factors && (
-                        <div className="space-y-2">
-                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2">Source Relevance Factors</span>
-                          <div className="bg-muted/30 p-4 rounded-lg border border-border/50 text-sm whitespace-pre-wrap text-foreground italic">
-                            {type.source_relevance_factors}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   )}
+
+                  <div className="mt-4 pt-4 border-t border-border/50 flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-tight">
+                    <span>Created: {new Date(type.created_at).toLocaleDateString()}</span>
+                    <span>Updated: {new Date(type.updated_at).toLocaleDateString()}</span>
+                  </div>
                 </CardContent>
               </Card>
             )

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       content,
       document_types!inner(transformation_instructions, name)
     `)
-    .order('created_at', { ascending: false });
+    .order('updated_at', { ascending: false });
 
   if (error) {
     console.error('Supabase error:', error);

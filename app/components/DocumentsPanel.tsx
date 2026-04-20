@@ -85,21 +85,21 @@ export default function DocumentsPanel() {
           name
         )
       `)
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
   );
 
   const { data: documentTypes } = useQuery(
     supabase
       .from('document_types')
       .select('id, name, ai')
-      .order('name')
+      .order('updated_at', { ascending: false })
   );
 
   const { data: subjects, isFetching: isFetchingSubjects, refetch: refetchSubjects } = useQuery(
     supabase
       .from('subjects')
       .select('id, name')
-      .order('name')
+      .order('updated_at', { ascending: false })
   );
 
   // Mutations

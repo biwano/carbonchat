@@ -37,7 +37,7 @@ export default function AdministrationPanel() {
           </TabsTrigger>
           <TabsTrigger value="types" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            Types
+            Document types
           </TabsTrigger>
           <TabsTrigger value="help" className="flex items-center gap-2">
             <HelpCircle className="w-4 h-4" />
@@ -50,12 +50,12 @@ export default function AdministrationPanel() {
             <DocumentsPanel />
           </TabsContent>
 
-          <TabsContent value="subjects" className="mt-0">
-            <SubjectsPanel />
-          </TabsContent>
-
           <TabsContent value="types" className="mt-0">
             <DocumentTypesPanel />
+          </TabsContent>
+
+          <TabsContent value="subjects" className="mt-0">
+            <SubjectsPanel />
           </TabsContent>
 
           <TabsContent value="help" className="mt-0">

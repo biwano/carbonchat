@@ -17,7 +17,10 @@ export type Database = {
           source_relevance_factors: string
           description?: string
           ai: boolean
+          date_limit_start_days_ago: number | null
+          date_limit_end_days_ago: number | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -27,7 +30,10 @@ export type Database = {
           source_relevance_factors?: string
           description?: string
           ai?: boolean
+          date_limit_start_days_ago?: number | null
+          date_limit_end_days_ago?: number | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -37,7 +43,10 @@ export type Database = {
           source_relevance_factors?: string
           description?: string
           ai?: boolean
+          date_limit_start_days_ago?: number | null
+          date_limit_end_days_ago?: number | null
           created_at?: string
+          updated_at?: string
         }
       }
       subjects: {
@@ -46,12 +55,14 @@ export type Database = {
           name: string
           content: string
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           name: string
           content: string
           created_at?: string
+          updated_at?: string
         }
       }
       documents: {

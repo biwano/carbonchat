@@ -53,7 +53,7 @@ export default function SubjectsPanel() {
     supabase
       .from('subjects')
       .select('*')
-      .order('name')
+      .order('updated_at', { ascending: false })
   );
 
   // Mutations using Supabase Cache Helpers
@@ -198,8 +198,9 @@ export default function SubjectsPanel() {
                 <div className="text-sm text-muted-foreground line-clamp-4 bg-muted/50 p-3 rounded border border-border/50 italic">
                   &quot;{subject.content}&quot;
                 </div>
-                <div className="mt-4 text-[10px] text-muted-foreground">
-                  Created: {new Date(subject.created_at).toLocaleDateString()}
+                <div className="mt-4 flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-tight">
+                  <span>Created: {new Date(subject.created_at).toLocaleDateString()}</span>
+                  <span>Updated: {new Date(subject.updated_at).toLocaleDateString()}</span>
                 </div>
               </CardContent>
             </Card>

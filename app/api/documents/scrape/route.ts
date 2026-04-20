@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
           ai,
           transformation_instructions,
           additional_sources,
-          source_relevance_factors
+          source_relevance_factors,
+          date_limit_start_days_ago,
+          date_limit_end_days_ago
         ),
         subjects (
           name,
@@ -44,11 +46,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const documentType = document.document_types as unknown as Pick<DocumentType, 'ai' | 'transformation_instructions' | 'additional_sources' | 'source_relevance_factors'> | null;
+    const documentType = document.document_types as unknown as Pick<DocumentType, 'ai' | 'transformation_instructions' | 'additional_sources' | 'source_relevance_factors' | 'date_limit_start_days_ago' | 'date_limit_end_days_ago'> | null;
     const subject = document.subjects as unknown as Pick<Subject, 'name' | 'content'> | null;
     const transformationInstructions = documentType?.transformation_instructions;
     const additionalSources = documentType?.additional_sources;
     const sourceRelevanceFactors = documentType?.source_relevance_factors;
+    const dateLimitStart = documentType?.date_limit_start_days_ago;
+    const dateLimitEnd = documentType?.date_limit_end_days_ago ?? 0;
+
+    let dateLimitInstruction = '';
+    if (dateLimitStart !== null && dateLimitStart !== undefined) {
+      const now = new Date();
+      const startDate = new Date(now.getTime() - (dateLimitStart * 24 * 60 * 60 * 1000));
+      const endDate = new Date(now.getTime() - (dateLimitEnd * 24 * 60 * 60 * 1000));
+      
+      const startStr = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const endStr = endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      
+      dateLimitInstruction = `**STRICT DATE LIMIT**: Only consider information and sources that were published between **${startStr}** and **${endStr}**. Ignore documents outside this range.`;
+    } else {
+      dateLimitInstruction = `**STRICT DATE LIMIT**: Prioritize the most recent information available. While there is no hard cutoff, favor latest developments and current data over historical or outdated facts.`;
+    }
 
     if (documentType && documentType.ai === false) {
       return NextResponse.json(
@@ -73,9 +91,10 @@ export async function POST(request: NextRequest) {
     **Research Phase:**
     1. Deeply analyze the provided Subject material.
     2. Use your research capabilities to investigate the "Additional Sources" provided (these may be URLs, blogs, social media accounts, or specific domains).
-    3. Look for the most recent information, favoring latest developments and current data over historical or outdated facts.
-    4. Rate and prioritize each source based on the "Source Relevance Factors" provided below.
-    5. Cross-reference information across multiple sources to ensure accuracy.
+    3. ${dateLimitInstruction}
+    4. Look for the most recent information, favoring latest developments and current data over historical or outdated facts.
+    5. Rate and prioritize each source based on the "Source Relevance Factors" provided below.
+    6. Cross-reference information across multiple sources to ensure accuracy.
     
     **Synthesis Phase:**
     1. Transform the gathered information according to the "Transformation Instructions" provided below.
@@ -105,6 +124,8 @@ export async function POST(request: NextRequest) {
     // Call OpenRouter (via OpenAI SDK) - using cheapest good model
     const completion = await openai.chat.completions.create({
       model: AI_MODEL,
+      // @ts-expect-error - OpenRouter server tools use custom types not in the standard OpenAI SDK
+      tools: [{ type: 'openrouter:web_search' }],
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Execute research and synthesis for the subject: ${subject.name}. Refer to the system instructions for specific details, sources, and relevance factors.` }
@@ -123,13 +144,29 @@ export async function POST(request: NextRequest) {
     let generatedContent = '';
     let generatedSources = '';
 
+    // Approach 2: Clean Grok-specific tags from content
+    const cleanGrokTags = (text: string) => {
+      if (!text) return text;
+      return text.replace(/<grok:render[^>]*>([\s\S]*?)<\/grok:render>/g, (match, inner) => {
+        const idMatch = inner.match(/<argument name="citation_id">(\d+)<\/argument>/);
+        if (idMatch) {
+          const id = parseInt(idMatch[1], 10) + 1;
+          return `[${id}]`;
+        }
+        return '';
+      });
+    };
+
     try {
       const parsedResponse = JSON.parse(responseText);
       generatedContent = parsedResponse.content;
       generatedSources = parsedResponse.sources || '';
+      
+      generatedContent = cleanGrokTags(generatedContent);
+      generatedSources = cleanGrokTags(generatedSources);
     } catch (e) {
       console.warn('Failed to parse AI response as JSON, falling back to raw text:', e);
-      generatedContent = responseText;
+      generatedContent = cleanGrokTags(responseText);
     }
 
     if (!generatedContent) {

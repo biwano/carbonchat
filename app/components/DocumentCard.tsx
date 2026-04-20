@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Play, Info, Edit, Trash2, Loader2, AlertCircle } from 'lucide-react';
@@ -26,35 +25,22 @@ export default function DocumentCard({
   onRefreshSuccess,
   isDeleting = false,
 }: DocumentCardProps) {
-  const [localError, setLocalError] = useState<string | null>(null);
-
   const scrapeMutation = useScrapeMutation(() => {
-    setLocalError(null);
     if (onRefreshSuccess) onRefreshSuccess();
   });
 
-  // Track if THIS document is being scraped anywhere (locally or via "Refresh All")
-  const mutationStates = useMutationState({
-    filters: { mutationKey: ['scrape'], status: 'pending' },
-    select: (mutation) => mutation.state.variables === doc.id ? mutation.state.status : null,
-  });
+  // Track the status of the LATEST research mutation for this document
+  // This ensures we show the current state and don't persist old errors after a success
+  const lastMutation = useMutationState({
+    filters: { mutationKey: ['scrape'] },
+    select: (mutation) => mutation.state.variables === doc.id ? mutation.state : null,
+  }).filter(Boolean).pop();
 
-  const isScraping = mutationStates.filter(Boolean).length > 0;
-
-  // Track global errors for this document
-  const errorStates = useMutationState({
-    filters: { mutationKey: ['scrape'], status: 'error' },
-    select: (mutation) => mutation.state.variables === doc.id ? (mutation.state.error as Error) : null,
-  });
-
-  const globalError = errorStates.filter(Boolean).pop();
-  const scrapeError = localError || (globalError ? (globalError as Error).message : null);
+  const isScraping = lastMutation?.status === 'pending';
+  const scrapeError = lastMutation?.status === 'error' ? (lastMutation.error as Error)?.message : null;
 
   const handleRefresh = () => {
-    setLocalError(null);
-    scrapeMutation.mutate(doc.id, {
-      onError: (error) => setLocalError(error.message)
-    });
+    scrapeMutation.mutate(doc.id);
   };
 
   return (
@@ -138,14 +124,10 @@ export default function DocumentCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-between items-center">
-          <div className="text-[10px] text-muted-foreground">
-            Created: {new Date(doc.created_at).toLocaleString()}
-          </div>
+        <div className="flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-tight">
+          <div>Created: {new Date(doc.created_at).toLocaleString()}</div>
           {doc.updated_at && (
-            <div className="text-[10px] text-muted-foreground">
-              Updated: {new Date(doc.updated_at).toLocaleString()}
-            </div>
+            <div>Updated: {new Date(doc.updated_at).toLocaleString()}</div>
           )}
         </div>
       </CardContent>
