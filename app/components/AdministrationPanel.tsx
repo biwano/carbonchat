@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Settings, BookOpen, HelpCircle, Tags, BarChart3 } from 'lucide-react';
 import DocumentsPanel from './DocumentsPanel';
@@ -9,8 +10,62 @@ import SubjectsPanel from './SubjectsPanel';
 import HelpPanel from './HelpPanel';
 import StatsPanel from './StatsPanel';
 
-export default function AdministrationPanel() {
-  const [activeAdminTab, setActiveAdminTab] = useState('documents');
+const ADMIN_TAB_VALUES = [
+  'documents',
+  'subjects',
+  'types',
+  'stats',
+  'help',
+] as const;
+type AdminTab = (typeof ADMIN_TAB_VALUES)[number];
+const DEFAULT_TAB: AdminTab = 'documents';
+
+const ADMIN_TABS = new Set<string>(ADMIN_TAB_VALUES);
+
+function isAdminTab(value: string): value is AdminTab {
+  return ADMIN_TABS.has(value);
+}
+
+function urlWithParams(pathname: string, params: URLSearchParams): string {
+  const q = params.toString();
+  return q ? `${pathname}?${q}` : pathname;
+}
+
+function AdministrationPanelInner() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const activeTab: AdminTab = useMemo(() => {
+    const raw = searchParams.get('tab');
+    if (raw && isAdminTab(raw)) return raw;
+    return DEFAULT_TAB;
+  }, [searchParams]);
+
+  // Normalize: drop redundant `?tab=documents` and strip invalid `tab` values
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (!tab) return;
+    if (!isAdminTab(tab) || tab === 'documents') {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete('tab');
+      router.replace(urlWithParams(pathname, next), { scroll: false });
+    }
+  }, [searchParams, pathname, router]);
+
+  const handleValueChange = useCallback(
+    (value: string) => {
+      if (!isAdminTab(value)) return;
+      const next = new URLSearchParams(searchParams.toString());
+      if (value === 'documents') {
+        next.delete('tab');
+      } else {
+        next.set('tab', value);
+      }
+      router.replace(urlWithParams(pathname, next), { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   return (
     <div className="space-y-6">
@@ -26,7 +81,7 @@ export default function AdministrationPanel() {
         </div>
       </div>
 
-      <Tabs value={activeAdminTab} onValueChange={setActiveAdminTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleValueChange} className="w-full">
         <TabsList className="grid w-full max-w-5xl grid-cols-2 sm:grid-cols-3 md:grid-cols-5 bg-muted border border-border gap-1 h-auto p-1">
           <TabsTrigger value="documents" className="flex items-center gap-2">
             <BookOpen className="w-4 h-4" />
@@ -73,5 +128,23 @@ export default function AdministrationPanel() {
         </div>
       </Tabs>
     </div>
+  );
+}
+
+function AdministrationPanelFallback() {
+  return (
+    <div className="space-y-6" aria-hidden>
+      <div className="mb-8 h-24 rounded-lg bg-muted/50 animate-pulse" />
+      <div className="h-12 max-w-5xl rounded-lg bg-muted/50 animate-pulse" />
+      <div className="h-64 rounded-lg bg-muted/30 animate-pulse" />
+    </div>
+  );
+}
+
+export default function AdministrationPanel() {
+  return (
+    <Suspense fallback={<AdministrationPanelFallback />}>
+      <AdministrationPanelInner />
+    </Suspense>
   );
 }
