@@ -11,6 +11,7 @@ import {
   Sparkles,
   User,
   Tags,
+  BarChart3,
 } from 'lucide-react';
 
 export default function HelpPanel() {
@@ -104,11 +105,12 @@ export default function HelpPanel() {
           <p>
             AI types also include{' '}
             <span className="text-foreground font-medium">additional sources</span>{' '}
-            (blogs, social media accounts, etc.) and{' '}
-            <span className="text-foreground font-medium">source relevance factors</span>.
+            (blogs, social media accounts, etc.),{' '}
+            <span className="text-foreground font-medium">source relevance factors</span>, and{' '}
+            <span className="text-foreground font-medium">date limits</span>.
           </p>
           <p>
-            The AI agent will research the additional sources to supplement its general research and use the relevance factors to prioritize and rate the quality of each source it finds.
+            The AI agent will research the additional sources to supplement its general research, use the relevance factors to prioritize and rate the quality of each source it finds, and strictly adhere to any configured date limits (e.g. &quot;at most 1 year old&quot;).
           </p>
           <p>
             A type also has an{' '}
@@ -155,6 +157,7 @@ export default function HelpPanel() {
             <li>The AI researches the subject (and any additional sources from the Type) and synthesizes content per the type&apos;s instructions.</li>
             <li>The result is stored as content, and any URLs found during research are saved in the <span className="text-foreground font-medium">Sources</span> field.</li>
             <li>You can edit it manually or use <span className="text-foreground font-medium">&quot;Refresh Content&quot;</span> anytime to regenerate it.</li>
+            <li>Use <span className="text-foreground font-medium">&quot;Refresh All Content&quot;</span> in the Documents panel to concurrently update all AI-researched documents at once.</li>
           </ol>
           <p className="text-foreground font-medium flex items-center gap-1 pt-1">
             <User className="w-4 h-4" />
@@ -205,6 +208,31 @@ export default function HelpPanel() {
               <span className="italic">&quot;Prioritize official documentation and GitHub repositories. Treat forum posts as low-relevance and ignore marketing landing pages.&quot;</span>
             </p>
           </div>
+          <div className="space-y-2">
+            <p className="text-foreground font-medium">5. Date Limits</p>
+            <p>
+              Restrict the research to a specific timeframe by setting start and end limits in days relative to today.
+              <br />
+              <span className="italic">Example: Set Start to 365 and End to 0 to only include research material from the last year.</span>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            Stats
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
+          <p>
+            The <span className="text-foreground font-medium">Stats</span> tab shows OpenRouter account credit figures: <span className="text-foreground font-medium">total</span> (purchased), <span className="text-foreground font-medium">used</span> (consumed), and <span className="text-foreground font-medium">remaining</span> (the difference). Data is fetched from OpenRouter; use <span className="text-foreground font-medium">Refresh</span> to pull the latest values.
+          </p>
+          <p>
+            A <span className="text-foreground font-medium">management API key</span> (or, for local development, the same key as chat if your OpenRouter project allows) must be configured on the server. These numbers reflect provider billing, not in-app message counts.
+          </p>
         </CardContent>
       </Card>
 
@@ -217,7 +245,10 @@ export default function HelpPanel() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground leading-relaxed space-y-3">
           <p>
-            On every user message, the chat engine loads **all** documents. Their contents are injected into the AI system prompt to ground every response in your curated knowledge.
+            On every user message, the chat engine loads **all** documents, sorted by their last update time. Their contents are injected into the AI system prompt to ground every response in your curated knowledge.
+          </p>
+          <p>
+            Carbonchat supports multi-turn conversations, meaning the AI remembers the context of previous messages in the current session while staying grounded in your documents.
           </p>
         </CardContent>
       </Card>
